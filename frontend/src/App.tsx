@@ -86,9 +86,11 @@ function SignedInApp() {
         </p>
       )}
 
-      <p>
-        API: <span className={`status status-${health}`}>{healthLabel(health)}</span>
-      </p>
+      {import.meta.env.DEV && (
+        <p>
+          API: <span className={`status status-${health}`}>{healthLabel(health)}</span>
+        </p>
+      )}
 
       <button type="button" onClick={() => void instance.logoutRedirect()}>
         Sign out
@@ -104,10 +106,11 @@ function SignedInApp() {
 function useRole(): string {
   const { instance, accounts } = useMsal();
   const [role, setRole] = useState<string>('loading');
+  const account = accounts[0];
+  const accountId = account?.homeAccountId;
 
   useEffect(() => {
     let cancelled = false;
-    const account = accounts[0];
     if (!account) return;
     (async () => {
       try {
@@ -141,7 +144,10 @@ function useRole(): string {
     return () => {
       cancelled = true;
     };
-  }, [instance, accounts]);
+    // Key on the stable account id, not the `accounts` array identity — MSAL can hand back a new
+    // array reference each render, which would otherwise re-fire the /api/me fetch every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [instance, accountId]);
 
   return role;
 }
@@ -149,6 +155,10 @@ function useRole(): string {
 function useHealth(): HealthState {
   const [health, setHealth] = useState<HealthState>('loading');
   useEffect(() => {
+    // Dev-only wiring indicator (see the render guard below) — don't even fetch in the built app,
+    // where the role round-trip already proves the frontend↔API wire and the family user has no
+    // use for "API: ok".
+    if (!import.meta.env.DEV) return;
     let cancelled = false;
     (async () => {
       try {

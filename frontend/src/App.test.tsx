@@ -87,18 +87,15 @@ describe('App — login gate + role proof (Sprint 3.4)', () => {
     // App content is gated away:
     expect(screen.queryByRole('button', { name: /sign out/i })).toBeNull();
     expect(screen.queryByText(/your role/i)).toBeNull();
-    expect(screen.queryByText('ok')).toBeNull(); // no health indicator when signed out
   });
 
-  it('signed in: shows the resolved role (end-to-end proof) + the health indicator', async () => {
+  it('signed in: shows the resolved role (the end-to-end proof)', async () => {
     h.state.authed = true;
     stubFetch({
-      '/api/health': { ok: true, body: { status: 'ok' } },
       '/api/me': { ok: true, body: { role: 'uploader' } },
     });
     render(<App />);
     await waitFor(() => expect(screen.getByText('uploader')).toBeTruthy());
-    await waitFor(() => expect(screen.getByText('ok')).toBeTruthy());
     expect(h.instance.acquireTokenSilent).toHaveBeenCalled();
   });
 
