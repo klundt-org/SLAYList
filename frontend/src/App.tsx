@@ -7,18 +7,20 @@ import { InteractionRequiredAuthError } from '@azure/msal-browser';
 import { apiScopes, loginRequest } from './auth/msalConfig.js';
 
 /**
- * Sprint 3.3 — the walking-skeleton UI, now auth-aware (client-side MSAL).
+ * Sprint 3.4 — the login gate + role proof.
  *
- * Jobs:
- *   1. Render the app heading + the AGPL §13 source-link footer (D15 — every UI from 0.3 on
- *      inherits this).
- *   2. Round-trip GET /api/health (anonymous) so the frontend ↔ API wire stays visibly verified.
- *   3. When signed out, offer "Sign in" (MSAL redirect). When signed in, acquire an access token
- *      for the API scope and read GET /api/me to display the caller's role (Sprint 3.4 polishes
- *      this into the real gate + role display).
+ * The app now REQUIRES login to show anything beyond the sign-in gate — this retires the
+ * Epic-2→Epic-3 "trivial skeleton only" window (the D22 corollary). Anonymous visitors see only the
+ * branded gate + the AGPL §13 source-link footer; signed-in users see their resolved role (the
+ * end-to-end proof) plus a dev health indicator.
  *
- * Logging discipline (D32): nothing logged here is PII — the role lookup carries no name/email,
- * and the health check has no body. Real mobile-first layout is Epic 8.
+ * IMPORTANT — this client gate is UX, not the security boundary (D22/D43/D44). The real gate is the
+ * API: every `/api/*` data request validates the bearer token and returns 401 without a valid,
+ * role-bearing one (`api/src/auth.ts`). A determined anonymous client can still fetch the static
+ * shell — which holds no family data. Never treat the UI gate as the access control.
+ *
+ * PII (D32): nothing here logs a name/email; the role string carries no PII. Real mobile-first
+ * layout + the player UI are Epic 8.
  */
 
 type HealthState = 'loading' | 'ok' | 'unreachable';
@@ -26,20 +28,15 @@ type HealthState = 'loading' | 'ok' | 'unreachable';
 const SOURCE_REPO_URL = 'https://github.com/rklundt/SLAYList';
 
 export function App() {
-  const health = useHealth();
-
   return (
     <main className="app">
-      <h1>SLAYList — it works</h1>
-      <p>
-        API: <span className={`status status-${health}`}>{healthLabel(health)}</span>
-      </p>
+      <h1>SLAYList</h1>
 
       <UnauthenticatedTemplate>
-        <SignIn />
+        <SignInGate />
       </UnauthenticatedTemplate>
       <AuthenticatedTemplate>
-        <RoleReadout />
+        <SignedInApp />
       </AuthenticatedTemplate>
 
       <footer className="footer">
@@ -51,11 +48,12 @@ export function App() {
   );
 }
 
-function SignIn() {
+/** Anonymous view: the gate. Signing in is the only available action. */
+function SignInGate() {
   const { instance } = useMsal();
   return (
     <section className="auth">
-      <p>Private family library — please sign in.</p>
+      <p>Private family music library. Please sign in to continue.</p>
       <button
         type="button"
         onClick={() => void instance.loginRedirect({ ...loginRequest, prompt: 'select_account' })}
@@ -66,13 +64,53 @@ function SignIn() {
   );
 }
 
-function RoleReadout() {
+/** Signed-in view: the role proof (the end-to-end chain) + a dev health indicator + sign out. */
+function SignedInApp() {
+  const { instance } = useMsal();
+  const role = useRole();
+  const health = useHealth();
+
+  // 'loading' | 'error' | 'none' are UI states, not real roles (roles are listener/uploader/admin).
+  const isRealRole = role !== 'loading' && role !== 'error' && role !== 'none';
+
+  return (
+    <section className="auth">
+      {role === 'loading' && <p>Signed in. Checking your role…</p>}
+      {role === 'error' && <p>Signed in, but we couldn’t load your role just now. Try refreshing the page.</p>}
+      {role === 'none' && (
+        <p>Signed in — but your account doesn’t have a role yet. Ask an admin to grant you access.</p>
+      )}
+      {isRealRole && (
+        <p>
+          Signed in. Your role: <span className="role">{role}</span>
+        </p>
+      )}
+
+      {import.meta.env.DEV && (
+        <p>
+          API: <span className={`status status-${health}`}>{healthLabel(health)}</span>
+        </p>
+      )}
+
+      <button type="button" onClick={() => void instance.logoutRedirect()}>
+        Sign out
+      </button>
+    </section>
+  );
+}
+
+/**
+ * Acquire an access token for the API scope and read GET /api/me to resolve the caller's role.
+ * Returns the role string, or a UI sentinel ('loading' | 'error' | 'none').
+ */
+function useRole(): string {
   const { instance, accounts } = useMsal();
   const [role, setRole] = useState<string>('loading');
+  const account = accounts[0];
+  const accountId = account?.homeAccountId;
 
   useEffect(() => {
     let cancelled = false;
-    const account = accounts[0];
     if (!account) return;
     (async () => {
       try {
@@ -106,33 +144,21 @@ function RoleReadout() {
     return () => {
       cancelled = true;
     };
-  }, [instance, accounts]);
+    // Key on the stable account id, not the `accounts` array identity — MSAL can hand back a new
+    // array reference each render, which would otherwise re-fire the /api/me fetch every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [instance, accountId]);
 
-  // 'loading' | 'error' | 'none' are UI states, not real roles (roles are listener/uploader/admin).
-  const isRealRole = role !== 'loading' && role !== 'error' && role !== 'none';
-
-  return (
-    <section className="auth">
-      {role === 'loading' && <p>Signed in. Checking your role…</p>}
-      {role === 'error' && <p>Signed in, but we couldn’t load your role just now. Try refreshing the page.</p>}
-      {role === 'none' && (
-        <p>Signed in — but your account doesn’t have a role yet. Ask an admin to grant you access.</p>
-      )}
-      {isRealRole && (
-        <p>
-          Signed in. Your role: <span className="role">{role}</span>
-        </p>
-      )}
-      <button type="button" onClick={() => void instance.logoutRedirect()}>
-        Sign out
-      </button>
-    </section>
-  );
+  return role;
 }
 
 function useHealth(): HealthState {
   const [health, setHealth] = useState<HealthState>('loading');
   useEffect(() => {
+    // Dev-only wiring indicator (see the render guard below) — don't even fetch in the built app,
+    // where the role round-trip already proves the frontend↔API wire and the family user has no
+    // use for "API: ok".
+    if (!import.meta.env.DEV) return;
     let cancelled = false;
     (async () => {
       try {

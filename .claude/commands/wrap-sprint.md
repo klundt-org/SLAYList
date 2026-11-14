@@ -53,7 +53,7 @@ Run each as a distinct perspective with its own checklist. For each, list concre
 
 ### 4. InfoSec
 - **D22 invariant (every sprint that deploys anything):** is the deployed environment reachable by an anonymous browser? If yes, **CRITICAL**. The `staticwebapp.config.json` route gate must be present in the deploy artifact; an anonymous `curl` against any URL of the deployed environment must redirect/401 before content. Verify, do not assume.
-- **D22 time-bounded corollary (active until Epic 3.4 supersedes the corollary bullet in `CLAUDE.md` in place):** is anything beyond the trivial skeleton (the "SLAYList — it works" page + a trivial `/api/health` endpoint) shipping behind the Epic-2-era gate? If yes, **CRITICAL** — the gate trusts any Microsoft account, not just family. When Epic 3.4's `/close-sprint` lands, this check is **superseded in place** — rewritten to a one-line historical pointer ("Corollary resolved by Epic 3.4 — see the historical note in `CLAUDE.md`"), NEVER silently deleted. Same supersession pattern used in `docs/DECISIONS.md`.
+- **D22 time-bounded corollary — RESOLVED by Sprint 3.4; no longer an active check.** The Epic-2→3 "trivial skeleton only" prohibition was retired when the login gate + role authorization shipped (family-restricted MSAL sign-in + API-side role validation). See the historical note in `CLAUDE.md` (the D22 corollary bullet). The **parent D22 invariant check above remains active** on every deploying sprint.
 - Every new endpoint authenticated AND role-checked server-side (not just hidden in UI).
 - Upload validation server-side; size cap enforced; no path traversal from filenames.
 - Finished audio not silently public; access scoped.
