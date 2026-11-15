@@ -4,7 +4,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { RestError, type TableClient } from '@azure/data-tables';
 import type { Song } from '@slaylist/shared';
-import { SongsRepository, type ListSongsOptions } from './repo.js';
+import { SongsRepository, getSongsRepository, _resetSongsRepositoryCache, type ListSongsOptions } from './repo.js';
 import { songToEntity, type SongEntity } from './entity.js';
 
 const song = (over: Partial<Song> = {}): Song => ({
@@ -121,5 +121,23 @@ describe('SongsRepository', () => {
     const { repo } = mockClient({ getEntity: vi.fn().mockRejectedValue(notFound), updateEntity });
     expect(await repo.update('slaylist-home', 'missing', { state: 'ready' })).toBeNull();
     expect(updateEntity).not.toHaveBeenCalled();
+  });
+});
+
+describe('getSongsRepository factory', () => {
+  it('throws a clear error when no storage connection string is configured', async () => {
+    const prevConn = process.env.AZURE_STORAGE_CONNECTION_STRING;
+    const prevWebJobs = process.env.AzureWebJobsStorage;
+    delete process.env.AZURE_STORAGE_CONNECTION_STRING;
+    delete process.env.AzureWebJobsStorage;
+    _resetSongsRepositoryCache();
+    try {
+      // connectionString() throws before any TableClient/network work, so this needs no storage.
+      await expect(getSongsRepository()).rejects.toThrow(/connection string/i);
+    } finally {
+      if (prevConn !== undefined) process.env.AZURE_STORAGE_CONNECTION_STRING = prevConn;
+      if (prevWebJobs !== undefined) process.env.AzureWebJobsStorage = prevWebJobs;
+      _resetSongsRepositoryCache();
+    }
   });
 });

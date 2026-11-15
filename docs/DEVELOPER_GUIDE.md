@@ -180,6 +180,17 @@ The budget alert (Sprint 1.1 / 9.1) is **cost** observability — a separate con
 
 The SWA managed-functions API authenticates to Storage via a **connection string** (Managed Identity is unavailable on managed functions — platform-forced). The connection string lives in SWA app settings + GitHub Actions secrets, never in code. The Container App transcoder uses **Managed Identity** + RBAC role assignments. Split auth posture is intentional and recorded in D25; don't try to unify it without first moving to bring-your-own-functions.
 
+## Table Storage schema evolution (D45)
+
+Table Storage is schemaless per-entity, so the `Song` shape (`shared/src/types.ts`) can drift from what's already stored. The policy, pinned here before Epic 4 persists real records:
+
+- **Additive by default.** New fields are **optional** (`field?:`). Old records simply lack them; readers must treat a missing field as `undefined`, never assume presence. The entity mapper already omits unset optionals and maps absent properties back to `undefined` (`api/src/songs/entity.ts`).
+- **No renames or type changes in place.** Renaming or re-typing a field is a *breaking* change. Do it with an **upgrade-on-read** step: read tolerates both the old and new property, writes emit the new one, so records migrate lazily as they're touched. Only after every record is known-migrated (or a one-off backfill runs) may the old property be dropped.
+- **Never repurpose a key.** `PartitionKey` (`libraryId`) and `RowKey` (`id`) are immutable for a record's life — changing either is a delete + re-insert, not an update.
+- **Keys are additive too.** A new access pattern that needs a different partition scheme is a new column/computed field or a secondary index strategy, decided in the sprint that needs it — not a silent repartition of the live table.
+
+The drift guard (`api/src/shared-runtime.test.ts`, D46) keeps the API's runtime constant mirror in step with `shared`; the `Song` *type* stays the single source of truth for the shape.
+
 ## Operational hazards (Azure portal quirks worth knowing)
 
 ### Managed Identity ID surfaces (cross-reference for D25 debugging)
