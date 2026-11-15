@@ -167,4 +167,27 @@ describe('App — song list (Sprint 4.3)', () => {
     render(<App />);
     await waitFor(() => expect(screen.getByText(/no songs yet/i)).toBeTruthy());
   });
+
+  // Sprint 5.3 — the upload UI is role-gated (uploader/admin only). The API enforces it too.
+  it('signed in as a listener: can see the list but NOT the upload form', async () => {
+    h.state.authed = true;
+    stubFetch({
+      '/api/me': { ok: true, body: { role: 'listener' } },
+      '/api/songs': { ok: true, body: { songs: [] } },
+    });
+    render(<App />);
+    await waitFor(() => expect(screen.getByText(/no songs yet/i)).toBeTruthy());
+    expect(screen.queryByText(/upload a song/i)).toBeNull();
+    expect(screen.queryByRole('button', { name: /^upload$/i })).toBeNull();
+  });
+
+  it('signed in as an uploader: the upload form IS shown', async () => {
+    h.state.authed = true;
+    stubFetch({
+      '/api/me': { ok: true, body: { role: 'uploader' } },
+      '/api/songs': { ok: true, body: { songs: [] } },
+    });
+    render(<App />);
+    await waitFor(() => expect(screen.getByText(/upload a song/i)).toBeTruthy());
+  });
 });

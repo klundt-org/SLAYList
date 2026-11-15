@@ -114,4 +114,12 @@ describe('POST /api/upload (Sprint 5.2)', () => {
     mockGetCaller.mockResolvedValue(uploader);
     expect((await upload(req({ badBody: true }), ctx)).status).toBe(400);
   });
+
+  // Sprint 5.3 — role-enforcement matrix: admin can upload too; listener/anon cannot (above).
+  it('201 for an admin (role matrix, Sprint 5.3)', async () => {
+    mockGetCaller.mockResolvedValue({ ownerOid: 'oid-ad', role: 'admin' });
+    const res = await upload(req({ file: mp3File(), title: 'Admin Song', ownerDisplayName: 'a@example.com' }), ctx);
+    expect(res.status).toBe(201);
+    expect(mockPutRaw).toHaveBeenCalledTimes(1);
+  });
 });
