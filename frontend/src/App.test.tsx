@@ -93,6 +93,7 @@ describe('App — login gate + role proof (Sprint 3.4)', () => {
     h.state.authed = true;
     stubFetch({
       '/api/me': { ok: true, body: { role: 'uploader' } },
+      '/api/songs': { ok: true, body: { songs: [] } },
     });
     render(<App />);
     await waitFor(() => expect(screen.getByText('uploader')).toBeTruthy());
@@ -104,6 +105,7 @@ describe('App — login gate + role proof (Sprint 3.4)', () => {
     const fetchMock = stubFetch({
       '/api/health': { ok: true, body: { status: 'ok' } },
       '/api/me': { ok: true, body: { role: 'admin' } },
+      '/api/songs': { ok: true, body: { songs: [] } },
     });
     render(<App />);
     await waitFor(() => expect(screen.getByText('admin')).toBeTruthy());
@@ -113,5 +115,56 @@ describe('App — login gate + role proof (Sprint 3.4)', () => {
     const headers = (meCall![1] as RequestInit).headers as Record<string, string>;
     expect(headers['X-SLAYLIST-Authorization']).toMatch(/^Bearer /);
     expect(headers['Authorization']).toBeUndefined();
+  });
+});
+
+describe('App — song list (Sprint 4.3)', () => {
+  const twoSongs = {
+    songs: [
+      { id: 'song_a', libraryId: 'slaylist-home', title: 'Rainbow Rocket', ownerOid: 'oid-1', ownerDisplayName: 'uploader@example.com', genre: 'pop', state: 'ready', createdAt: '2026-11-15T00:00:00Z' },
+      { id: 'song_b', libraryId: 'slaylist-home', title: 'Dino Stomp', ownerOid: 'oid-1', ownerDisplayName: 'uploader@example.com', state: 'processing', createdAt: '2026-11-15T00:00:00Z' },
+    ],
+  };
+
+  it('signed in with a role: lists songs with title / owner / genre / state', async () => {
+    h.state.authed = true;
+    stubFetch({
+      '/api/me': { ok: true, body: { role: 'uploader' } },
+      '/api/songs': { ok: true, body: twoSongs },
+    });
+    render(<App />);
+    await waitFor(() => expect(screen.getByText('Rainbow Rocket')).toBeTruthy());
+    expect(screen.getByText('Dino Stomp')).toBeTruthy();
+    expect(screen.getAllByText('uploader@example.com').length).toBeGreaterThan(0); // owner column
+    expect(screen.getByText('pop')).toBeTruthy(); // genre
+    expect(screen.getByText('ready')).toBeTruthy(); // state
+    expect(screen.getByText('processing')).toBeTruthy();
+    // genre is optional — the second song has none; it renders an em-dash, not "undefined".
+    expect(screen.queryByText(/undefined/)).toBeNull();
+  });
+
+  it('signed in: calls /api/songs with the SWA-safe custom header (D44)', async () => {
+    h.state.authed = true;
+    const fetchMock = stubFetch({
+      '/api/me': { ok: true, body: { role: 'admin' } },
+      '/api/songs': { ok: true, body: twoSongs },
+    });
+    render(<App />);
+    await waitFor(() => expect(screen.getByText('Rainbow Rocket')).toBeTruthy());
+    const songsCall = fetchMock.mock.calls.find((c) => String(c[0]).includes('/api/songs'));
+    expect(songsCall).toBeTruthy();
+    const headers = (songsCall![1] as RequestInit).headers as Record<string, string>;
+    expect(headers['X-SLAYLIST-Authorization']).toMatch(/^Bearer /);
+    expect(headers['Authorization']).toBeUndefined();
+  });
+
+  it('signed in: an empty library shows "No songs yet"', async () => {
+    h.state.authed = true;
+    stubFetch({
+      '/api/me': { ok: true, body: { role: 'listener' } },
+      '/api/songs': { ok: true, body: { songs: [] } },
+    });
+    render(<App />);
+    await waitFor(() => expect(screen.getByText(/no songs yet/i)).toBeTruthy());
   });
 });
