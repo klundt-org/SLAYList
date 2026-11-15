@@ -4,7 +4,9 @@
 import { useEffect, useState } from 'react';
 import { AuthenticatedTemplate, UnauthenticatedTemplate, useMsal } from '@azure/msal-react';
 import { InteractionRequiredAuthError } from '@azure/msal-browser';
-import { apiScopes, loginRequest } from './auth/msalConfig.js';
+import { loginRequest } from './auth/msalConfig.js';
+import { useApiFetch } from './api/client.js';
+import { SongList } from './songs/SongList.js';
 
 /**
  * Sprint 3.4 — the login gate + role proof.
@@ -86,6 +88,15 @@ function SignedInApp() {
         </p>
       )}
 
+      {/* The song list reads real metadata (Sprint 4.3). Only shown once a real role resolves —
+          an account with no role gets 403 from /api/songs, so there's nothing to list. */}
+      {isRealRole && (
+        <section className="songs">
+          <h2>Songs</h2>
+          <SongList />
+        </section>
+      )}
+
       {import.meta.env.DEV && (
         <p>
           API: <span className={`status status-${health}`}>{healthLabel(health)}</span>
@@ -100,27 +111,18 @@ function SignedInApp() {
 }
 
 /**
- * Acquire an access token for the API scope and read GET /api/me to resolve the caller's role.
+ * Read GET /api/me (through the shared authenticated client) to resolve the caller's role.
  * Returns the role string, or a UI sentinel ('loading' | 'error' | 'none').
  */
 function useRole(): string {
-  const { instance, accounts } = useMsal();
+  const apiFetch = useApiFetch();
   const [role, setRole] = useState<string>('loading');
-  const account = accounts[0];
-  const accountId = account?.homeAccountId;
 
   useEffect(() => {
     let cancelled = false;
-    if (!account) return;
     (async () => {
       try {
-        const result = await instance.acquireTokenSilent({ scopes: apiScopes, account });
-        // Custom header, NOT Authorization: Azure Static Web Apps overwrites `Authorization` with
-        // its own internal platform token before the request reaches the managed Functions API, so
-        // the user's bearer token must ride in a header SWA forwards untouched (D44).
-        const res = await fetch('/api/me', {
-          headers: { 'X-SLAYLIST-Authorization': `Bearer ${result.accessToken}` },
-        });
+        const res = await apiFetch('/api/me');
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}`);
         }
@@ -129,11 +131,7 @@ function useRole(): string {
           setRole(body.role ?? 'none');
         }
       } catch (err) {
-        // A silent-token failure that needs interaction -> fall back to a redirect.
-        if (err instanceof InteractionRequiredAuthError) {
-          void instance.acquireTokenRedirect({ scopes: apiScopes });
-          return;
-        }
+        if (err instanceof InteractionRequiredAuthError) return; // a redirect is in flight
         if (!cancelled) {
           setRole('error');
           // D32: nothing here is PII — the role lookup carries no name/email.
@@ -144,10 +142,7 @@ function useRole(): string {
     return () => {
       cancelled = true;
     };
-    // Key on the stable account id, not the `accounts` array identity — MSAL can hand back a new
-    // array reference each render, which would otherwise re-fire the /api/me fetch every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [instance, accountId]);
+  }, [apiFetch]);
 
   return role;
 }

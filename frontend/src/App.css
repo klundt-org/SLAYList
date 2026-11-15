@@ -52,3 +52,29 @@ body {
   padding: 0.5rem 0;
   min-height: 2.75rem;
 }
+
+/* Song list (Sprint 4.3) — plain table; real mobile-first styling is Epic 8. */
+.songs {
+  margin-top: 1.25rem;
+  width: 100%;
+}
+.song-list {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+.song-list th,
+.song-list td {
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.3);
+}
+.song-list th {
+  font-weight: 600;
+}
+.state {
+  font-variant: small-caps;
+}
+.state-ready { color: #1a7f37; }
+.state-processing { color: #9a6700; }
+.state-failed { color: #cf222e; }
