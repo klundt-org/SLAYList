@@ -1,0 +1,40 @@
+# Copyright (c) 2026 Ray Klundt
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Continuous-integration test gate. Runs the Vitest suites across all workspaces.
+#   - This is the HARD gate (D23): as of Sprint 4.1 a test failure fails the job, which (via the
+#     `develop` branch-protection required-status-check) BLOCKS merge into develop. It supersedes the
+#     soft-mode (`continue-on-error`) era that ran from Sprint 2.2 through Epic 3.
+#   - Triggers on pull_request INTO develop (so it gates the merge) and on push to develop (so a direct
+#     push is still verified). Deliberately separate from deploy-dev.yml: this workflow needs no
+#     secrets and no `id-token`/deploy permissions, so nothing a PR can trigger carries deploy rights.
+
+name: ci
+
+on:
+  pull_request:
+    branches: [develop]
+  push:
+    branches: [develop]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # setup-node BEFORE pnpm/action-setup: pnpm 11.3.0 requires Node >=22.13, but the runner's
+      # default Node is 20, so installing pnpm first fails ERR_PNPM_UNSUPPORTED_ENGINE.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22       # D18 runtime/CI parity
+      - uses: pnpm/action-setup@v4
+        with:
+          standalone: true     # install @pnpm/exe (bundles its own Node). pnpm/action-setup is a JS
+                               # action, so it runs under the runner's Node 20 -- too old to install
+                               # pnpm 11.3.0 via the normal self-installer (ERR_PNPM_UNSUPPORTED_ENGINE).
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test           # Vitest across workspaces (D23/D34) -- hard gate, no continue-on-error

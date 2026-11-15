@@ -94,6 +94,18 @@ A private, login-gated family music library. Kids upload songs they made, play t
 
 Filename convention: `{title-slug}_{yyyyMMdd-HHmmss}_{shortid}.{ext}` — readable for restore, unique by shortid.
 
+### Table Storage key mapping (D45)
+
+The record above persists to the `Songs` table with **`PartitionKey = libraryId`** and **`RowKey = id`**:
+
+| Table property | Source field | Notes |
+|---|---|---|
+| `PartitionKey` | `libraryId` | One value today (`'slaylist-home'`); never assumed-single (D19). The library *is* the partition. |
+| `RowKey` | `id` | Unique within the partition; drives the blob shortid (D8). |
+| (entity properties) | all other `Song` fields | Optional fields absent when unset (not null); `createdAt`/`deactivatedAt` are ISO-8601 strings. |
+
+Making the library the partition is deliberate: library-scoping (D20) becomes **structural** — a query always names one `PartitionKey`, so it can only see one library's records — and the primary "list all songs in a library" read (Epic 4.3, Epic 8) is a single-partition query, the cheapest Table Storage offers. Reserved names (`PartitionKey`/`RowKey`/`Timestamp`/`ETag`) are Azure's; our `createdAt` is a separate app field from the system `Timestamp`. Rejected alternatives (`PartitionKey = ownerOid`, a single constant partition, composite state-in-key) are in D45. The data-access code lands in Sprint 4.2.
+
 ## Audio format
 
 Opus (smaller, open) is preferred; AAC/.m4a is the max-compatibility fallback for older Apple devices. Transcoder converts all uploads to the chosen output. Decide one as the default in Epic 6; keep the input allowlist permissive, the output single and consistent.

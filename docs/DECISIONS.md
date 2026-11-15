@@ -506,3 +506,26 @@ If a real-RG resource fails to materialize from the Bicep, the Bicep is fixed be
 **Verify-don't-assume:** "SWA forwards the client `Authorization` header to managed functions" was an unstated assumption that cost a debugging cycle at test-time — add **"SWA reserves/overwrites `Authorization` (and `x-ms-*`) to managed functions; carry app tokens in a custom header"** to the verify-don't-assume checklist alongside D18/D26/D27/D34/D36/D37.
 
 **Cross-references:** **D43** (the MSAL/bearer model this is the transport for), **D25** (SWA managed-functions platform constraints — same "what SWA does to requests" family), **D22** (the gate this header carries), Sprint 3.3 (implementation + live verification).
+
+## D45 — Song records map onto Table Storage as `PartitionKey = libraryId`, `RowKey = id`
+
+**Decision (Sprint 4.1):** the `Song` record (`shared/src/types.ts`) persists to the `Songs` table (dev account `stmusicslaylistdevuse2`, provisioned Sprint 1.3) with:
+- **`PartitionKey` = `libraryId`** — the application-level library label (D19). One value today, `'slaylist-home'`; never assumed-single.
+- **`RowKey` = `id`** — the unique song id (also drives the blob shortid, D8). Unique within its partition.
+- Every other `Song` field is a plain entity property. Optional fields (`createdByKid`, `genre`, `deactivatedAt`, `blobPath`, `format`, `sizeBytes`, `durationSec`) are simply **absent** when unset, not stored as null. Timestamps (`createdAt`, `deactivatedAt`) are **ISO-8601 strings**, distinct from Azure Tables' own system `Timestamp` property.
+
+**Why this mapping:**
+- **Library-scoping is structural, not just checked in code (D20).** Because the library is the partition, every read/write names a single `PartitionKey`, so a query can only ever see one library's records — cross-library isolation falls out of the storage layout, and it's impossible to accidentally write a query that reaches across libraries. The D20 "always ask can-this-person-act-within-this-`libraryId`" check and the storage key agree.
+- **"List all songs in a library" is a single-partition query** — the cheapest, fastest access pattern Table Storage offers, and it's the app's primary read (Epic 4.3 list screen, Epic 8 playback). No cross-partition scan.
+- **No hot-partition risk at family scale** (~tens to low-hundreds of records in one partition). The per-record-write property that made us pick Table Storage over a shared JSON file (D3) is preserved: two uploaders writing different `RowKey`s in the same partition never collide.
+
+**Reserved-name note:** Azure Tables reserves the property names `PartitionKey`, `RowKey`, `Timestamp`, and `ETag`. Our `id` becomes `RowKey` and our `libraryId` becomes `PartitionKey`; our `createdAt` is a *separate* app field and must not be conflated with the system `Timestamp` (which is set by the service, not us).
+
+**Rejected alternatives:**
+- **`PartitionKey = ownerOid`** — scatters one library's songs across as many partitions as there are uploaders, turning the primary "list all songs" read into a cross-partition scan, and makes library-scoping a code-only check rather than a structural guarantee. Rejected.
+- **`PartitionKey = "songs"` (a single constant)** — works at small scale but throws away the library dimension that D19/D20 require be first-class, and would need a schema migration the day multi-library (deferred, not designed-out) arrives. Rejected.
+- **Composite keys** (e.g. `RowKey = "{state}_{id}"`) to make state-filtered reads cheaper — premature; at family scale a client-side or property filter on `state` is fine, and baking state into the key makes the common "flip state" update a delete-plus-insert. Rejected; revisit only if list reads ever get expensive.
+
+**Scope note:** this decision is the *key mapping*. The repository/data-access code that reads and writes these entities lands in **Sprint 4.2**; this sprint only documents the schema and hardens the test gate.
+
+**Cross-references:** **D3** (Table Storage, not a JSON file — the per-record-write reasoning), **D19** (`libraryId` everywhere, supersedes D12), **D20** (library-scoped authz — now also library-scoped storage), **D8** (title is metadata, `id`/filename is plumbing), **D33** (the nightly backup in Sprint 4.4 exports this table), Sprint 1.3 (the `Songs` table provisioned), Sprint 4.2 (the CRUD operations against this mapping).
