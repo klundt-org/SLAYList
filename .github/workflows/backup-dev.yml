@@ -1,0 +1,51 @@
+# Copyright (c) 2026 Ray Klundt
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Nightly backup of the dev Songs metadata table (Sprint 4.4, D33). Table Storage has no soft-delete
+# or versioning, so this self-made JSON Lines export to the `table-backups` container is the only
+# recovery path for a bad delete / metadata corruption. Audio is NOT involved (it's in Blob Storage,
+# which already has soft-delete + versioning).
+#
+# ───────────────────────────────────────────────────────────────────────────────────────────────
+# TO TURN THIS OFF (e.g. if the project is retired):
+#   • Easiest: GitHub repo → Actions tab → "backup-dev" → ⋯ → "Disable workflow". One toggle, done.
+#   • Or delete this file (.github/workflows/backup-dev.yml) and push.
+#   • Or delete the repo.
+# Nothing in Azure keeps running or billing after that — the backups are tiny blobs and the 30-day
+# prune rule is free. No standing Azure compute exists for this job; it only runs inside GitHub.
+# ───────────────────────────────────────────────────────────────────────────────────────────────
+#
+# Auth: the storage connection string (AZURE_STORAGE_CONNECTION_STRING, already a CI secret — the
+# D25 connection-string posture), never a key in the repo. Runs entirely in GitHub Actions; there is
+# no Azure-side scheduled resource to manage.
+
+name: backup-dev
+
+on:
+  schedule:
+    - cron: '0 8 * * *' # 08:00 UTC nightly (~overnight in the Americas). Approximate — GitHub may delay/skip under load; fine for a backup.
+  workflow_dispatch: {} # manual run (used to verify the job end-to-end)
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    name: Export Songs table -> table-backups
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # setup-node BEFORE pnpm/action-setup (pnpm 11.3.0 needs Node >=22.13; runner default is 20).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@v4
+        with:
+          standalone: true
+      - run: pnpm install --frozen-lockfile
+      # The backup script imports the compiled repo + serializer from api/dist, so build the api first.
+      - run: pnpm --filter @slaylist/api run build
+      - name: Run the backup
+        env:
+          AZURE_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
+        run: pnpm --filter @slaylist/api run backup

@@ -20,6 +20,7 @@ const song = (over: Partial<Song> = {}): Song => ({
 
 type ClientMock = {
   createEntity: ReturnType<typeof vi.fn>;
+  upsertEntity: ReturnType<typeof vi.fn>;
   getEntity: ReturnType<typeof vi.fn>;
   listEntities: ReturnType<typeof vi.fn>;
   updateEntity: ReturnType<typeof vi.fn>;
@@ -32,6 +33,7 @@ function mockClient(over: Partial<ClientMock> = {}) {
   }
   const client: ClientMock = {
     createEntity: vi.fn().mockResolvedValue({}),
+    upsertEntity: vi.fn().mockResolvedValue({}),
     getEntity: vi.fn(),
     listEntities: vi.fn().mockReturnValue(empty()),
     updateEntity: vi.fn().mockResolvedValue({}),
@@ -51,6 +53,18 @@ describe('SongsRepository', () => {
     expect(written.partitionKey).toBe('slaylist-home');
     expect(written.rowKey).toBe('song_1');
     expect(written.genre).toBe('pop');
+  });
+
+  it('upsert() inserts-or-replaces the entity (idempotent restore) and returns the song', async () => {
+    const { client, repo } = mockClient();
+    const s = song({ id: 'song_r', state: 'deactivated' });
+    const result = await repo.upsert(s);
+    expect(result).toEqual(s);
+    expect(client.upsertEntity).toHaveBeenCalledTimes(1);
+    const [entityArg, mode] = client.upsertEntity.mock.calls[0]!;
+    expect(mode).toBe('Replace');
+    expect((entityArg as SongEntity).rowKey).toBe('song_r');
+    expect((entityArg as SongEntity).state).toBe('deactivated');
   });
 
   it('get() returns the mapped song', async () => {
