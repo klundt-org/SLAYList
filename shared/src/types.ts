@@ -87,3 +87,34 @@ export interface Song {
   /** Duration of the finished audio in seconds. Filled by transcoder. */
   durationSec?: number;
 }
+
+/**
+ * The client-supplied fields when creating a song record (the POST body).
+ *
+ * The SERVER sets everything else — `id`, `libraryId`, `ownerOid` (from the validated token,
+ * never the client — it's the authz key, D21), `state` (`'processing'`), and `createdAt`. A
+ * client may supply its own `ownerDisplayName` (display-only, never used in authz, D21/D32), so
+ * a dishonest value only mislabels the client's own upload; it carries no authorization weight.
+ */
+export interface SongCreateInput {
+  /** Display name for the song. Required. PII-adjacent — stored for display, never logged (D32). */
+  title: string;
+  /** Entra `preferred_username` of the uploader (display only). Stored, never used in authz (D21). */
+  ownerDisplayName: string;
+  /** Optional: which kid made the song. */
+  createdByKid?: string;
+  /** Optional: for later search. */
+  genre?: string;
+}
+
+/**
+ * The fields that may be changed on an existing song record (the PATCH body). Identity and
+ * ownership (`id`, `libraryId`, `ownerOid`, `ownerDisplayName`, `createdAt`) are immutable — a
+ * record never changes library or owner. All fields are optional; only those present are applied.
+ */
+export type SongUpdateInput = Partial<
+  Pick<
+    Song,
+    'title' | 'genre' | 'createdByKid' | 'state' | 'blobPath' | 'format' | 'sizeBytes' | 'durationSec' | 'deactivatedAt'
+  >
+>;
