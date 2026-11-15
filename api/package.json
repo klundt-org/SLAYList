@@ -18,10 +18,10 @@
   "dependencies": {
     "@azure/data-tables": "13.3.2",
     "@azure/functions": "4.16.0",
+    "@azure/storage-blob": "12.34.0",
     "jose": "6.2.15"
   },
   "devDependencies": {
-    "@azure/storage-blob": "12.34.0",
     "@slaylist/shared": "workspace:*"
   }
 }

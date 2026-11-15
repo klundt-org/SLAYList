@@ -21,6 +21,7 @@
 import { TableClient, RestError, odata } from '@azure/data-tables';
 import type { Song, SongUpdateInput } from '@slaylist/shared';
 import { entityToSong, songToEntity, type SongEntity } from './entity.js';
+import { storageConnectionString } from '../storage.js';
 
 const TABLE_NAME = 'Songs';
 
@@ -108,15 +109,6 @@ export class SongsRepository {
 let cached: SongsRepository | null = null;
 let ensured = false;
 
-/** Resolve the storage connection string (deployed app setting, or Azurite locally). */
-function connectionString(): string {
-  const conn = process.env.AZURE_STORAGE_CONNECTION_STRING ?? process.env.AzureWebJobsStorage;
-  if (!conn) {
-    throw new Error('No storage connection string: set AZURE_STORAGE_CONNECTION_STRING (or AzureWebJobsStorage).');
-  }
-  return conn;
-}
-
 /**
  * The process-wide `SongsRepository`, built lazily from app settings and cached. On first build it
  * ensures the `Songs` table exists (idempotent — a no-op in dev/prod where Sprint 1.3 created it,
@@ -124,7 +116,7 @@ function connectionString(): string {
  */
 export async function getSongsRepository(): Promise<SongsRepository> {
   if (cached) return cached;
-  const client = TableClient.fromConnectionString(connectionString(), TABLE_NAME, {
+  const client = TableClient.fromConnectionString(storageConnectionString(), TABLE_NAME, {
     allowInsecureConnection: true, // permits Azurite's http endpoint locally; no effect on https (Azure)
   });
   if (!ensured) {
