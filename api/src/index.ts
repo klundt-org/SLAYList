@@ -17,3 +17,4 @@
 import './functions/health.js';
 import './functions/me.js';
 import './functions/songs.js';
+import './functions/upload.js';

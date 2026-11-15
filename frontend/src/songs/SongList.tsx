@@ -11,8 +11,8 @@
 
 import { useSongs } from './useSongs.js';
 
-export function SongList() {
-  const state = useSongs();
+export function SongList({ reloadKey = 0 }: { reloadKey?: number }) {
+  const state = useSongs(reloadKey);
 
   if (state.status === 'loading') return <p>Loading songs…</p>;
   if (state.status === 'error') return <p>Couldn’t load songs just now. Try refreshing the page.</p>;

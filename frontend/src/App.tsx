@@ -7,6 +7,7 @@ import { InteractionRequiredAuthError } from '@azure/msal-browser';
 import { loginRequest } from './auth/msalConfig.js';
 import { useApiFetch } from './api/client.js';
 import { SongList } from './songs/SongList.js';
+import { UploadForm } from './upload/UploadForm.js';
 
 /**
  * Sprint 3.4 — the login gate + role proof.
@@ -71,9 +72,11 @@ function SignedInApp() {
   const { instance } = useMsal();
   const role = useRole();
   const health = useHealth();
+  const [reloadKey, setReloadKey] = useState(0);
 
   // 'loading' | 'error' | 'none' are UI states, not real roles (roles are listener/uploader/admin).
   const isRealRole = role !== 'loading' && role !== 'error' && role !== 'none';
+  const canUpload = role === 'uploader' || role === 'admin';
 
   return (
     <section className="auth">
@@ -88,12 +91,15 @@ function SignedInApp() {
         </p>
       )}
 
+      {/* Upload form (Sprint 5.2) — uploader/admin only (the API enforces the role too). */}
+      {canUpload && <UploadForm onUploaded={() => setReloadKey((k) => k + 1)} />}
+
       {/* The song list reads real metadata (Sprint 4.3). Only shown once a real role resolves —
           an account with no role gets 403 from /api/songs, so there's nothing to list. */}
       {isRealRole && (
         <section className="songs">
           <h2>Songs</h2>
-          <SongList />
+          <SongList reloadKey={reloadKey} />
         </section>
       )}
 

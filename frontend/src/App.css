@@ -78,3 +78,23 @@ body {
 .state-ready { color: #1a7f37; }
 .state-processing { color: #9a6700; }
 .state-failed { color: #cf222e; }
+
+/* Upload form (Sprint 5.2) — plain; real UI is Epic 8. */
+.upload {
+  margin-top: 1.25rem;
+  width: 100%;
+}
+.upload form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  align-items: flex-start;
+}
+.upload label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+}
+.upload-ok { color: #1a7f37; }
+.upload-error { color: #cf222e; }

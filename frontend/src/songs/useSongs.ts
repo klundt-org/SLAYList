@@ -19,7 +19,7 @@ export type SongsState =
   | { status: 'error' }
   | { status: 'ready'; songs: Song[] };
 
-export function useSongs(): SongsState {
+export function useSongs(reloadKey = 0): SongsState {
   const apiFetch = useApiFetch();
   const [state, setState] = useState<SongsState>({ status: 'loading' });
 
@@ -42,7 +42,8 @@ export function useSongs(): SongsState {
     return () => {
       cancelled = true;
     };
-  }, [apiFetch]);
+    // reloadKey bump re-runs the fetch (e.g. after an upload adds a record).
+  }, [apiFetch, reloadKey]);
 
   return state;
 }
