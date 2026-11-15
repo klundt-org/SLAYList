@@ -33,6 +33,10 @@ jobs:
   backup:
     name: Export Songs table -> table-backups
     runs-on: ubuntu-latest
+    # The storage connection string is a `dev` ENVIRONMENT secret (same as the deploy job), so this
+    # job must opt into that environment to read it — without this it sees no secret and the export
+    # fails with "No storage connection string".
+    environment: dev
     steps:
       - uses: actions/checkout@v4
       # setup-node BEFORE pnpm/action-setup (pnpm 11.3.0 needs Node >=22.13; runner default is 20).
