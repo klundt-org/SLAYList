@@ -28,26 +28,10 @@ env:
   SWA_NAME: swa-music-slaylist-dev-use2
 
 jobs:
-  test:
-    # Soft-mode: test failures do NOT block merge until Sprint 4.1 hardens this (D23).
-    name: Test (soft mode)
-    runs-on: ubuntu-latest
-    continue-on-error: true   # soft-mode: report red/green but never fail the workflow (D23)
-    steps:
-      - uses: actions/checkout@v4
-      # setup-node BEFORE pnpm/action-setup: pnpm 11.3.0 requires Node >=22.13, but the runner's
-      # default Node is 20, so installing pnpm first fails ERR_PNPM_UNSUPPORTED_ENGINE.
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22       # D18 runtime/CI parity
-      - uses: pnpm/action-setup@v4
-        with:
-          standalone: true     # install @pnpm/exe (bundles its own Node). pnpm/action-setup is a JS
-                               # action, so it runs under the runner's Node 20 -- too old to install
-                               # pnpm 11.3.0 via the normal self-installer (ERR_PNPM_UNSUPPORTED_ENGINE).
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm test           # Vitest across workspaces (D23/D34)
-
+  # Tests live in ci.yml (the hard gate, D23) -- it runs on pull_request into develop AND on push to
+  # develop, so by the time this deploy workflow runs on a develop push the suite has already been
+  # verified. Keeping deploy separate means this workflow's elevated OIDC/deploy permissions are never
+  # exposed to a PR-triggered run.
   build-and-deploy:
     name: Build + deploy to dev SWA
     runs-on: ubuntu-latest
