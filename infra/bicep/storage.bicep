@@ -92,6 +92,40 @@ resource containers 'Microsoft.Storage/storageAccounts/blobServices/containers@2
   }
 }]
 
+// --- Lifecycle: prune nightly table backups after 30 days (Sprint 4.4, D33) ---
+// This BACKUP-pruning rule is scoped to the `table-backups/` prefix ONLY, and is explicitly allowed
+// by D33 (it deletes old *backups*, not source data). It does NOT and must NOT touch `raw-uploads`
+// (D28 forbids any deletion-class rule there — the kids' originals are the canonical archive) or
+// `finished`. 30 days matches the blob soft-delete window for one recovery number to remember.
+resource backupLifecycle 'Microsoft.Storage/storageAccounts/managementPolicies@2023-05-01' = {
+  parent: storage
+  name: 'default'
+  properties: {
+    policy: {
+      rules: [
+        {
+          name: 'prune-table-backups-30d'
+          enabled: true
+          type: 'Lifecycle'
+          definition: {
+            filters: {
+              blobTypes: ['blockBlob']
+              prefixMatch: ['table-backups/']
+            }
+            actions: {
+              baseBlob: {
+                delete: {
+                  daysAfterModificationGreaterThan: 30
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+
 // --- Table service: Songs table ---
 resource tableService 'Microsoft.Storage/storageAccounts/tableServices@2023-05-01' = {
   parent: storage

@@ -43,6 +43,15 @@ export class SongsRepository {
     return song;
   }
 
+  /**
+   * Insert-or-replace a full record. Used by restore (D33): re-importing a backup must work whether
+   * the row is missing (deleted) or still present, so it's idempotent — unlike `create`.
+   */
+  async upsert(song: Song): Promise<Song> {
+    await this.client.upsertEntity(songToEntity(song), 'Replace');
+    return song;
+  }
+
   /** Fetch one record by id within a library, or null if it doesn't exist. */
   async get(libraryId: string, id: string): Promise<Song | null> {
     try {

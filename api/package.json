@@ -10,6 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "seed": "node scripts/seed-songs.mjs",
+    "backup": "node scripts/backup-songs-table.mjs",
+    "restore": "node scripts/restore-songs-table.mjs",
     "prestart": "node -e \"const fs=require('fs');if(!fs.existsSync('local.settings.json')){fs.copyFileSync('local.settings.json.example','local.settings.json');console.log('Created local.settings.json from .example template')}\"",
     "start": "func start"
   },
@@ -19,6 +21,7 @@
     "jose": "6.2.15"
   },
   "devDependencies": {
+    "@azure/storage-blob": "12.34.0",
     "@slaylist/shared": "workspace:*"
   }
 }
