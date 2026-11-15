@@ -28,6 +28,10 @@ Signed-off-by: Your Name <your.email@example.com>
 
 That sign-off is your acknowledgement of both the DCO and the relicensing grant above. Pull requests without sign-offs on every commit will not be merged.
 
+## Tests must pass
+
+As of Epic 4, the test suite is a **hard merge gate**. Every pull request into `develop` runs the `unit-tests` check (Vitest across all workspaces, defined in `.github/workflows/ci.yml`); a failing check blocks the merge, and `develop` requires the PR to be up to date before merging. Run `pnpm -r run test` locally before opening a PR. (This superseded the earlier advisory "soft mode" that ran from the first CI setup through Epic 3.)
+
 ## File headers
 
 Every source file in this repository carries a two-line header:

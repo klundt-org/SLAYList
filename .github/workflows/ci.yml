@@ -22,7 +22,9 @@ permissions:
 
 jobs:
   test:
-    name: Test
+    # Distinct check name (not the generic "Test") so the develop branch-protection required-status
+    # context can't be accidentally satisfied by some future workflow that also has a "Test" job.
+    name: unit-tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
