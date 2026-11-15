@@ -74,8 +74,8 @@ The core loop (4→5→6→7) is split into separately-testable layers on purpos
 - **Exit:** app lists songs from real metadata; no audio yet; nightly metadata backups running. **✅ Met.**
 
 ### Epic 5 — Upload & raw storage (no transcoding)
-- ⬜ 5.1 Input validation (allowlist + size cap) — decide specifics
-- ⬜ 5.2 Upload UI + API endpoint → raw blob + `processing` record
+- ✅ 5.1 Input validation (allowlist + size cap) — **owner decision:** permissive defaults `mp3/wav/m4a/flac/ogg/opus` + **50 MB**, both **configurable** via app settings `UPLOAD_ALLOWED_EXTENSIONS`/`UPLOAD_MAX_BYTES` (`api/src/upload/validation.ts`). Server-side `validateUpload` (extension allowlist, size cap, zero-size + path-traversal reject, lenient content-type gate), clear messages, 11 tests. BACKLOG: resolved the allowlist/size question; added an "account types/tiers" deferral (per-account limits at account creation). **Note:** declared-metadata only — magic-byte verification of the actual bytes is 5.2's job.
+- ⬜ 5.2 Upload UI + API endpoint → raw blob + `processing` record — calls `validateUpload` (5.1) AND must magic-byte-sniff the real bytes (a renamed non-audio file passes the declared-metadata check); filename `{title-slug}_{timestamp}_{shortid}.{ext}` (D8); no inline transcode (D5)
 - ⬜ 5.3 Role enforcement (uploader/admin only)
 - **Exit:** upload lands raw file + `processing` record; stays processing.
 
