@@ -1,0 +1,42 @@
+# Copyright (c) 2026 Ray Klundt
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# gitleaks config for the CI secret-scan gate (.github/workflows/ci.yml, `secret-scan` job).
+# Layer 2 of the D31/D48 secret-scanning posture: GitHub-native secret scanning + push protection
+# are layer 1 (free on this PUBLIC repo; re-enabled after the 2026-11 transfer to the klundt-org
+# org, which reset them). This CI job runs `gitleaks git` over the FULL history on every PR / push
+# to develop and BLOCKS merge via the develop branch-protection required check.
+#
+# `useDefault = true` keeps gitleaks' entire built-in ruleset; the allowlist below only ADDS
+# exceptions (gitleaks appends allowlists, it never replaces the rules).
+
+title = "SLAYList gitleaks config"
+
+[extend]
+useDefault = true
+
+# The guides and the wrap-sprint checklist intentionally quote secret-SHAPED PLACEHOLDERS (never
+# real values) to explain what must NOT be committed -- e.g. `AccountKey=...` and
+# `DefaultEndpointsProtocol=https;AccountName=...` in the storage guides, and the D25 "forbidden
+# shapes" list in .claude/commands/wrap-sprint.md. Allowlist those documentation paths so prose
+# ABOUT secrets doesn't fail the scan. Real secrets never live in the repo (public-repo hygiene,
+# docs/DEVELOPER_GUIDE.md), and GitHub push protection (layer 1) still covers these paths too.
+[[allowlists]]
+description = "Documentation that quotes secret-shaped placeholders, not real secrets"
+paths = [
+  '''docs/guides/.*\.md''',
+  '''\.claude/commands/.*\.md''',
+  '''infra/.*\.example''',
+  '''docs/VERSIONS\.md''',
+]
+
+# `$SCOPE_ID_ACCESS` in scripts/bootstrap-auth-app.ps1 is the FIXED OAuth2 permission-scope id for the
+# user-auth Entra app (D42). It is a stable NON-SECRET identifier -- it's declared publicly in the app
+# registration's manifest, and it's hardcoded (a deliberately fake-looking GUID) so the bootstrap is
+# idempotent (same discipline as the app-role ids). The generic-api-key rule trips on it only because
+# the variable name contains "ACCESS" next to a quoted value. Scoped to that one rule + that one exact
+# value, so any genuine secret in that script is still caught.
+[[allowlists]]
+description = "Fixed OAuth2 permission-scope id (non-secret identifier, hardcoded for idempotency)"
+targetRules = ["generic-api-key"]
+regexes = ['''a1b2c3d4-e5f6-4789-a0b1-c2d3e4f5a6b7''']

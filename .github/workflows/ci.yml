@@ -40,3 +40,24 @@ jobs:
                                # pnpm 11.3.0 via the normal self-installer (ERR_PNPM_UNSUPPORTED_ENGINE).
       - run: pnpm install --frozen-lockfile
       - run: pnpm test           # Vitest across workspaces (D23/D34) -- hard gate, no continue-on-error
+
+  secret-scan:
+    # Layer 2 of the D48 secret-scanning posture. GitHub-native secret scanning + push protection are
+    # layer 1 (free on this public repo; re-enabled after the 2026-11 transfer to the klundt-org org,
+    # which reset them). This job runs gitleaks over the FULL git history on every PR / push to develop
+    # and BLOCKS merge via the develop branch-protection required check. The pinned gitleaks BINARY is
+    # used deliberately -- the gitleaks GitHub Action requires a paid license for organization accounts;
+    # the MIT CLI has no such gate. Config + allowlist: .gitleaks.toml (extends the built-in ruleset).
+    name: secret-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0       # full history: gitleaks scans every commit, not just HEAD
+      - name: gitleaks (scan full history)
+        env:
+          GITLEAKS_VERSION: '8.30.1'   # pinned (version discipline, docs/VERSIONS.md)
+        run: |
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" -o gitleaks.tar.gz
+          tar -xzf gitleaks.tar.gz gitleaks
+          ./gitleaks git --redact -v --no-banner --exit-code 1 .

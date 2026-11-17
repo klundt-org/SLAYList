@@ -85,7 +85,7 @@ param(
   [string]$Region = 'use2',
   [string]$Workload = 'music',
   [string]$App = 'slaylist',
-  [string]$RepoOwner = 'rklundt',
+  [string]$RepoOwner = 'klundt-org',
   [string]$RepoName = 'SLAYList',
   # Entra app display name. Defaults to slaylist-github-deploy-<env> -- a SEPARATE app per environment
   # (two-app model, D7): the dev identity holds dev-RG rights only and can never reach prod.
@@ -142,9 +142,11 @@ if ($stFull.Length -le 24) { $storageName = $stFull }
 elseif ($stNoWorkload.Length -le 24) { $storageName = $stNoWorkload }
 else { $storageName = $stMinimal }
 
-# Environment-based federated subject (NOT branch-based). ${RepoName} is brace-delimited so a bare
-# "$RepoName:environment" isn't parsed as a variable scope qualifier.
-$fedSubject = "repo:$RepoOwner/${RepoName}:environment:$Env"
+# Environment-based federated subject (NOT branch-based). The exact SUBJECT string is resolved AFTER
+# preflight from GitHub's OIDC sub-claim setting (name-based path vs immutable numeric IDs), so the
+# federated credential always matches what THIS repo's Actions actually present -- see the resolver
+# block below. ${RepoName} is brace-delimited so a bare "$RepoName:environment" isn't parsed as a
+# variable scope qualifier.
 $fedName = "github-$RepoOwner-$RepoName-env-$Env"
 $ghRepo = "$RepoOwner/$RepoName"
 $idSecretNames = @('AZURE_CLIENT_ID', 'AZURE_TENANT_ID', 'AZURE_SUBSCRIPTION_ID')
@@ -152,7 +154,7 @@ $connSecretNames = @('AZURE_STORAGE_CONNECTION_STRING', 'APPINSIGHTS_CONNECTION_
 
 Info "=== Bootstrap deploy identity: env=$Env ==="
 Note "App: $AppDisplayName | RG (Contributor scope): $ResourceGroup"
-Note "Federated subject (environment-based): $fedSubject"
+Note "Federated subject: resolved from GitHub's OIDC sub-claim setting after preflight"
 Note "GitHub env deploy policy: $(if ($RestrictDeployToBranch) { "only branch '$RestrictDeployToBranch'" } else { 'any branch' })"
 Note "Storage: $storageName | App Insights: $appInsightsName | Repo: $ghRepo"
 if ($DryRun) { Write-Host "(DRY RUN -- no changes will be made)" -ForegroundColor Yellow }
@@ -168,6 +170,23 @@ Ok "az: $($acct.user.name) / sub $($acct.name)"
 gh auth status 2>$null | Out-Null
 if ($LASTEXITCODE -ne 0) { Write-Error "Not logged in to gh. Run: gh auth login."; exit 2 }
 Ok "gh: authenticated"
+
+# --- Resolve the federated SUBJECT to match what THIS repo's GitHub actually presents ---
+# GitHub orgs can enable "immutable" OIDC subjects (use_immutable_subject). When ON, the subject is keyed
+# to immutable numeric org/repo IDs -- repo:<org>@<orgId>/<repo>@<repoId>:environment:<env> -- NOT the
+# mutable path repo:<org>/<repo>:... . That is a transfer/rename HARDENING: a renamed or re-created repo
+# path can't silently inherit the OIDC trust. klundt-org has it ON. Rather than hardcode either form, we
+# ask GitHub for the exact `sub_claim_prefix` and append the environment segment, so the credential we
+# create below always matches the presented assertion whether or not the org enables immutable subjects
+# (D30). If the setting can't be read (older GitHub, permissions), we fall back to the name-based path.
+$fedSubject = "repo:$RepoOwner/${RepoName}:environment:$Env"   # name-based fallback
+$subCfg = gh api "repos/$ghRepo/actions/oidc/customization/sub" 2>$null | ConvertFrom-Json
+if ($subCfg -and $subCfg.use_immutable_subject -and $subCfg.sub_claim_prefix) {
+  $fedSubject = "$($subCfg.sub_claim_prefix):environment:$Env"
+  Ok "OIDC subject mode: IMMUTABLE -> $fedSubject"
+} else {
+  Ok "OIDC subject mode: name-based -> $fedSubject"
+}
 Write-Host ""
 
 # --- 1. Entra app registration (idempotent; duplicate-name guard) ---
@@ -254,14 +273,23 @@ if ($fedExists) {
   }
   if (-not $DryRun) { $global:LASTEXITCODE = $script:fedRc; Assert-LastOk "federated credential create"; Ok "created (no client secret)" }
 }
-# Cleanup: remove any superseded BRANCH-based federated credential (from the earlier approach).
+# Cleanup: remove superseded credentials so there's exactly one trust rule for this env.
+#   (a) BRANCH-based creds from the earlier (pre-environment) approach.
+#   (b) STALE env-based creds whose subject != the resolved one -- e.g. a name-based cred left behind
+#       after the org enabled immutable subjects, or an old-path cred after a repo transfer. (This is
+#       exactly the two-cred state the 2026-11 klundt-org transfer produced.)
 if ($appId -and -not $DryRun) {
   $branchCredIds = @(az ad app federated-credential list --id $appId --query "[?contains(subject, ':ref:refs/heads/')].id" -o tsv --only-show-errors 2>$null)
   foreach ($cid in $branchCredIds) {
     az ad app federated-credential delete --id $appId --federated-credential-id $cid --only-show-errors 2>$null | Out-Null
     Note "removed superseded branch-based federated credential"
   }
-} elseif ($DryRun) { Note "[dry-run] would: remove any superseded branch-based federated credential" }
+  $staleEnvCredIds = @(az ad app federated-credential list --id $appId --query "[?ends_with(subject, ':environment:$Env') && subject != '$fedSubject'].id" -o tsv --only-show-errors 2>$null)
+  foreach ($cid in $staleEnvCredIds) {
+    az ad app federated-credential delete --id $appId --federated-credential-id $cid --only-show-errors 2>$null | Out-Null
+    Note "removed stale env-based federated credential (subject != resolved)"
+  }
+} elseif ($DryRun) { Note "[dry-run] would: remove any superseded branch-based or stale env-based federated credential" }
 
 Stop-If-Past 4
 # --- 4. Contributor RBAC on the env RG ONLY (D7) ---
