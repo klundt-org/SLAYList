@@ -28,7 +28,7 @@ import { UploadForm } from './upload/UploadForm.js';
 
 type HealthState = 'loading' | 'ok' | 'unreachable';
 
-const SOURCE_REPO_URL = 'https://github.com/rklundt/SLAYList';
+const SOURCE_REPO_URL = 'https://github.com/klundt-org/SLAYList';
 
 export function App() {
   return (

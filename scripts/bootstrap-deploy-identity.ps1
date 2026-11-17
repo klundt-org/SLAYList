@@ -85,7 +85,7 @@ param(
   [string]$Region = 'use2',
   [string]$Workload = 'music',
   [string]$App = 'slaylist',
-  [string]$RepoOwner = 'rklundt',
+  [string]$RepoOwner = 'klundt-org',
   [string]$RepoName = 'SLAYList',
   # Entra app display name. Defaults to slaylist-github-deploy-<env> -- a SEPARATE app per environment
   # (two-app model, D7): the dev identity holds dev-RG rights only and can never reach prod.

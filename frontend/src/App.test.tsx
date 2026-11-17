@@ -72,7 +72,7 @@ describe('App — login gate + role proof (Sprint 3.4)', () => {
     stubFetch({});
     render(<App />);
     const link = screen.getByRole('link', { name: /Source code \(AGPL-3\.0-or-later\)/i });
-    expect(link.getAttribute('href')).toBe('https://github.com/rklundt/SLAYList');
+    expect(link.getAttribute('href')).toBe('https://github.com/klundt-org/SLAYList');
   });
 
   it('signed out: shows ONLY the sign-in gate — no role, no health, no sign-out', () => {

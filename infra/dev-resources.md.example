@@ -237,7 +237,7 @@ Provisioned by `scripts/bootstrap-deploy-identity.ps1` (idempotent; re-run any t
 
 - **Entra deploy app display name:** `slaylist-github-deploy-dev`  (SEPARATE app per environment — D7 two-app model; prod gets its own `slaylist-github-deploy-prod` at Epic 9)
 - **App (client) ID:** `<deploy-app-client-id>`  (stored as the `dev` environment secret `AZURE_CLIENT_ID`)
-- **Federated credential subject (environment-based):** `repo:rklundt/SLAYList:environment:dev`  (prod: `…:environment:prod` at Epic 9)
+- **Federated credential subject (environment-based):** `repo:klundt-org/SLAYList:environment:dev`  (prod: `…:environment:prod` at Epic 9)
 - **RBAC:** Contributor on `rg-music-slaylist-dev-use2` only (NOT subscription; D7)
 - **GitHub environment:** `dev`, deployment-branch policy = **any branch** (prod: `prod` env gated to `main` only)
 
