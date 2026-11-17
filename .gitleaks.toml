@@ -29,3 +29,14 @@ paths = [
   '''infra/.*\.example''',
   '''docs/VERSIONS\.md''',
 ]
+
+# `$SCOPE_ID_ACCESS` in scripts/bootstrap-auth-app.ps1 is the FIXED OAuth2 permission-scope id for the
+# user-auth Entra app (D42). It is a stable NON-SECRET identifier -- it's declared publicly in the app
+# registration's manifest, and it's hardcoded (a deliberately fake-looking GUID) so the bootstrap is
+# idempotent (same discipline as the app-role ids). The generic-api-key rule trips on it only because
+# the variable name contains "ACCESS" next to a quoted value. Scoped to that one rule + that one exact
+# value, so any genuine secret in that script is still caught.
+[[allowlists]]
+description = "Fixed OAuth2 permission-scope id (non-secret identifier, hardcoded for idempotency)"
+targetRules = ["generic-api-key"]
+regexes = ['''a1b2c3d4-e5f6-4789-a0b1-c2d3e4f5a6b7''']
