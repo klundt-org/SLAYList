@@ -38,8 +38,8 @@ param notificationEmail string
 @description('Budget amount in USD per month.')
 param budgetAmountUsd int = 15
 
-@description('Container image reference for the transcoder. Defaults to the same public placeholder the live dev Container App runs (Sprint 1.4). Sprint 6.1 swaps in the real transcoder image.')
-param containerAppImage string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+@description('Container App SHELL image (bootstrap default). Since Sprint 6.0 the RUNNING image is CD-managed (deploy-transcoder-dev.yml pins an immutable GHCR digest), so the live digest differs from this moving :dev tag by design — D39 impl. note (Bicep owns the shell, CD owns the image).')
+param containerAppImage string = 'ghcr.io/klundt-org/slaylist-transcoder:dev'
 
 @description('Container App vCPU tier. Memory is derived to the valid Consumption-profile pair in containerapp.bicep. dev default 0.25; prod passes a higher tier (e.g. 0.5 / 1.0) for faster transcodes.')
 @allowed([
