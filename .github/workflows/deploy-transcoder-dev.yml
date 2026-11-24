@@ -76,3 +76,39 @@ jobs:
           az containerapp update \
             -n "$CA_NAME" -g "$AZURE_RG" \
             --image "${IMAGE}@${{ steps.build.outputs.digest }}"
+
+      - name: Verify the new revision provisioned with the pushed image (fail if not)
+        # `az containerapp update` returns as soon as the control plane ACCEPTS the change — it does
+        # NOT confirm the revision actually pulled the image. Assert that here so a failed pull (e.g.
+        # the GHCR package still private on the first run) is a RED build, not a silent green.
+        # This is also the Sprint 6.0 bullet-3 proof: scale-to-zero (minReplicas=0, D4) + no ingress
+        # means 0 replicas at rest and no console log to grep, so a revision that reaches
+        # `Provisioned` pinned to our digest IS the "image deployed and runs" evidence.
+        run: |
+          set -euo pipefail
+          EXPECTED="${IMAGE}@${{ steps.build.outputs.digest }}"
+          echo "Expecting latest revision to provision with: $EXPECTED"
+          deadline=$(( SECONDS + 180 ))
+          while :; do
+            rev=$(az containerapp show -n "$CA_NAME" -g "$AZURE_RG" \
+                    --query "properties.latestRevisionName" -o tsv)
+            state=$(az containerapp revision show -n "$CA_NAME" -g "$AZURE_RG" --revision "$rev" \
+                    --query "properties.provisioningState" -o tsv)
+            image=$(az containerapp revision show -n "$CA_NAME" -g "$AZURE_RG" --revision "$rev" \
+                    --query "properties.template.containers[0].image" -o tsv)
+            echo "revision=$rev state=$state image=$image"
+            if [ "$state" = "Provisioned" ]; then
+              [ "$image" = "$EXPECTED" ] || { echo "::error::revision image '$image' != expected '$EXPECTED'"; exit 1; }
+              echo "OK: revision $rev provisioned with the pushed digest."
+              break
+            fi
+            if [ "$state" = "Failed" ]; then
+              echo "::error::revision $rev failed to provision (likely image pull — is the GHCR package public? see docs/guides/6.0-ghcr-package-public.md)"
+              exit 1
+            fi
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "::error::timed out waiting for revision $rev to provision (last state: $state)"
+              exit 1
+            fi
+            sleep 10
+          done

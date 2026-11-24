@@ -18,6 +18,9 @@ FROM alpine:3.21
 RUN addgroup -S slay && adduser -S slay -G slay
 USER slay
 
-# A startup line we can grep for in the Container App's console logs (the 6.0 proof), then
-# block forever so the single replica stays Running under scale-to-zero (minReplicas=0, D4).
+# Log a startup line, then block forever. Under scale-to-zero (minReplicas=0, D4) with no
+# ingress/queue trigger there is nothing to activate a replica at rest, so the 6.0 proof is the
+# revision reaching `Provisioned` on the pushed digest (asserted in the deploy workflow), not a
+# console log. The long sleep still matters: IF a replica ever starts (minReplicas raised, or
+# Epic 7's queue trigger), the process stays up instead of exiting 0 and looking like a crash.
 CMD ["sh", "-c", "echo 'slaylist-transcoder placeholder: image pulled and running (Sprint 6.0)'; while true; do sleep 3600; done"]
