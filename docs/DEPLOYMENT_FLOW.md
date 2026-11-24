@@ -65,6 +65,34 @@ Bicep (D41) — see `guides/2.1-oidc-deploy-auth.md`.
 | `ERR_PNPM_UNSUPPORTED_ENGINE` | pnpm 11.3.0 needs Node ≥22.13; runner default is Node 20 | `setup-node` (22) **before** `pnpm/action-setup`, and `standalone: true` so `@pnpm/exe` bundles its own Node (the action itself runs under the runner's Node 20) |
 | `Function language info isn't provided` | `swa deploy` can't infer the managed-functions runtime from the artifact | pass `--api-language node --api-version 22` explicitly |
 
+### 1b. Transcoder image deploy — the image-side counterpart (Sprint 6.0, D49)
+
+The frontend+API ship as files to the SWA (above); the transcoder ships as a **container image**.
+`.github/workflows/deploy-transcoder-dev.yml` fires on push to `develop` touching `transcoder/**`
+(or `workflow_dispatch`):
+
+1. **Build + push** `transcoder/Dockerfile` to **public GHCR** — `ghcr.io/klundt-org/slaylist-transcoder`,
+   tagged moving `:dev` + immutable `:sha-<gitsha>`. Push auth is the automatic `GITHUB_TOKEN`
+   (`permissions: packages: write`) — **no stored PAT/secret**. A public image also needs **no pull
+   credential** on the Container App.
+2. **Azure login via OIDC** — the *same* federated `dev` identity that deploys the app (D30/D37),
+   so there's still no long-lived secret in the path.
+3. **`az containerapp update` by digest** — the dev Container App is pinned to the exact
+   `...@sha256:<digest>` this run built (reproducible, rollback-able, always a new revision), not
+   the moving tag.
+4. **Assert the revision provisioned** — the workflow polls the latest revision until
+   `provisioningState == Provisioned` on the pushed digest and fails red otherwise, so a failed
+   image pull (e.g. the GHCR package still private on the first run) can't masquerade as a green deploy.
+
+**Bicep vs. CD split (D39 impl. note):** Bicep (`containerapp.bicep`) owns the Container App *shell*;
+the **running image digest is a CD-managed artifact** set here — exactly as section 1 owns the SWA
+shell while its site content is deployed content. So the live image legitimately differs from the
+Bicep `:dev` default, and `drift-check.ps1` flags it in its REVIEW note as *expected*, not drift to fix.
+
+**One-time human step:** GHCR creates a new package **private**; the credential-free Container App
+can't pull it until it's flipped to **Public** once (`guides/6.0-ghcr-package-public.md`). GHCR then
+remembers the visibility for every future push.
+
 ---
 
 ## 2. Runtime flow — what a visitor hits (the D22 gate)
