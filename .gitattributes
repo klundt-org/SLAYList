@@ -9,3 +9,11 @@
 
 # Shell scripts MUST be LF or bash chokes on the trailing CR.
 *.sh  text eol=lf
+
+# Dockerfiles and GitHub Actions workflows are consumed on Linux (the CI runner, the Docker
+# build context). Pin them LF so a Windows contributor's autocrlf can't check out CRLF and
+# break a RUN/CMD line or a shell `run:` step.
+Dockerfile   text eol=lf
+*.Dockerfile text eol=lf
+*.yml        text eol=lf
+*.yaml       text eol=lf

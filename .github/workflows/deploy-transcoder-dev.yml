@@ -1,0 +1,114 @@
+# Copyright (c) 2026 Ray Klundt
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Sprint 6.0 — builds the transcoder container image, pushes it to GHCR, and updates the dev
+# Container App revision. The image-side counterpart to deploy-dev.yml (which ships frontend+API).
+#
+#   - Registry: PUBLIC GHCR (ghcr.io/klundt-org/slaylist-transcoder) — D49. The image holds only
+#     public (AGPL) code + public tooling, no secrets or family data, so a public image leaks
+#     nothing AND needs no pull credential on the Container App.
+#   - Push auth: the automatic GITHUB_TOKEN (permissions.packages: write) — no stored PAT/secret.
+#   - Deploy auth: OIDC federation via the `dev` GitHub environment (D30/D37), same identity that
+#     deploys the app. `az containerapp update` runs under that session (Contributor on the dev RG).
+#   - Image/Bicep split (D39 impl. note): Bicep owns the Container App SHELL; the running image
+#     DIGEST is a CD-managed artifact set here (like Epic 2's SWA site content), not Bicep-tracked.
+#   - No D22 gate here: the Container App has no ingress (queue-driven), so there is no public edge.
+
+name: deploy-transcoder-dev
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - 'transcoder/**'
+      - '.github/workflows/deploy-transcoder-dev.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write   # push to GHCR with the automatic GITHUB_TOKEN (no stored secret)
+  id-token: write   # OIDC for azure/login
+
+env:
+  IMAGE: ghcr.io/klundt-org/slaylist-transcoder
+  AZURE_RG: rg-music-slaylist-dev-use2
+  CA_NAME: ca-music-slaylist-dev-use2
+
+jobs:
+  build-push-deploy:
+    name: Build + push image + update dev Container App
+    runs-on: ubuntu-latest
+    environment: dev    # OIDC subject -> environment:dev; exposes dev env-scoped secrets only
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR (automatic GITHUB_TOKEN — no stored secret)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build + push image (moving :dev tag + immutable :sha-<gitsha>)
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ./transcoder
+          file: ./transcoder/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:dev
+            ${{ env.IMAGE }}:sha-${{ github.sha }}
+
+      - name: Azure login (OIDC — no stored secret, D30)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Update dev Container App to the pushed image (by immutable digest)
+        # Deploy by DIGEST, not the moving :dev tag, so the revision is pinned to exactly the
+        # bytes this run built (reproducible, rollback-able) and a new revision is always created.
+        run: |
+          az containerapp update \
+            -n "$CA_NAME" -g "$AZURE_RG" \
+            --image "${IMAGE}@${{ steps.build.outputs.digest }}"
+
+      - name: Verify the new revision provisioned with the pushed image (fail if not)
+        # `az containerapp update` returns as soon as the control plane ACCEPTS the change — it does
+        # NOT confirm the revision actually pulled the image. Assert that here so a failed pull (e.g.
+        # the GHCR package still private on the first run) is a RED build, not a silent green.
+        # This is also the Sprint 6.0 bullet-3 proof: scale-to-zero (minReplicas=0, D4) + no ingress
+        # means 0 replicas at rest and no console log to grep, so a revision that reaches
+        # `Provisioned` pinned to our digest IS the "image deployed and runs" evidence.
+        run: |
+          set -euo pipefail
+          EXPECTED="${IMAGE}@${{ steps.build.outputs.digest }}"
+          echo "Expecting latest revision to provision with: $EXPECTED"
+          deadline=$(( SECONDS + 180 ))
+          while :; do
+            rev=$(az containerapp show -n "$CA_NAME" -g "$AZURE_RG" \
+                    --query "properties.latestRevisionName" -o tsv)
+            state=$(az containerapp revision show -n "$CA_NAME" -g "$AZURE_RG" --revision "$rev" \
+                    --query "properties.provisioningState" -o tsv)
+            image=$(az containerapp revision show -n "$CA_NAME" -g "$AZURE_RG" --revision "$rev" \
+                    --query "properties.template.containers[0].image" -o tsv)
+            echo "revision=$rev state=$state image=$image"
+            if [ "$state" = "Provisioned" ]; then
+              [ "$image" = "$EXPECTED" ] || { echo "::error::revision image '$image' != expected '$EXPECTED'"; exit 1; }
+              echo "OK: revision $rev provisioned with the pushed digest."
+              break
+            fi
+            if [ "$state" = "Failed" ]; then
+              echo "::error::revision $rev failed to provision (likely image pull — is the GHCR package public? see docs/guides/6.0-ghcr-package-public.md)"
+              exit 1
+            fi
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "::error::timed out waiting for revision $rev to provision (last state: $state)"
+              exit 1
+            fi
+            sleep 10
+          done

@@ -190,6 +190,9 @@ if ($review.Count -gt 0) {
   Write-Host "REVIEW ($($review.Count)): what-if cannot diff these, so this check does NOT cover them -" -ForegroundColor Magenta
   Write-Host "  the Container App image/resources/env and diagnostic-setting categories. Confirm those" -ForegroundColor Magenta
   Write-Host "  manually if you changed them (the same-sprint Bicep discipline is the real guard)." -ForegroundColor Magenta
+  Write-Host "  NOTE (Sprint 6.0+, D39 impl.): the live Container App image is EXPECTED to differ from the" -ForegroundColor Magenta
+  Write-Host "  Bicep ':dev' tag — the running DIGEST is CD-managed (deploy-transcoder-dev.yml pins it)," -ForegroundColor Magenta
+  Write-Host "  not Bicep-tracked. A digest mismatch here is by design, NOT drift to 'fix' in the template." -ForegroundColor Magenta
   if ($ShowNoise) { $review | ForEach-Object { Write-Host "  $_" -ForegroundColor Magenta } }
 }
 

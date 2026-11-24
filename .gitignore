@@ -4,6 +4,10 @@ node_modules/
 dist/
 build/
 .vite/
+# Bicep compile artifact: `az bicep build` emits infra/bicep/main.json next to the
+# .bicep source. The .bicep files are the source of truth (D39); the compiled JSON is
+# a transient build output and must never be committed.
+infra/bicep/*.json
 # assembled SWA managed-functions deploy artifact (pnpm deploy output)
 api/__deploy/
 # local env / secrets — NEVER commit

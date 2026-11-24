@@ -25,8 +25,8 @@ param caeName string
 @description('Container App name (from naming module).')
 param caName string
 
-@description('Container image reference. Defaults to the same public placeholder the live dev Container App runs (Sprint 1.4). Sprint 6.1 swaps in the real transcoder image via this parameter.')
-param containerAppImage string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+@description('Container App SHELL image reference (the bootstrap default). Since Sprint 6.0 the RUNNING image is a CD-managed artifact: deploy-transcoder-dev.yml pushes to GHCR and pins the Container App to an immutable DIGEST via `az containerapp update`, so the live digest legitimately differs from this moving :dev tag (D39 impl. note — Bicep owns the shell, CD owns the image, like Epic 2 owns the SWA shell vs. its site content). This default is what a fresh deploy (incl. prod, Sprint 9.1) bootstraps with before its first CD run.')
+param containerAppImage string = 'ghcr.io/klundt-org/slaylist-transcoder:dev'
 
 @description('Storage account name — for RBAC scope (same RG as this deployment).')
 param storageName string
