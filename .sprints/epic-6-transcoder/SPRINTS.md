@@ -27,6 +27,22 @@ Reviewer focus added to this sprint at planning time. Prod image pipeline = Epic
 
 ---
 
+## Sprint 6.0.1 — Dependabot re-triage + override refresh  **[Agent]** *(inserted/emergent)*
+
+*Second security-triage pass, mirroring Sprint 3.1.5's proven methodology. Surfaced when a branch push warned the default branch carried **91 open Dependabot alerts** (3 critical, 34 high, 43 moderate, 11 low) — up from the 23 that 3.1.5 drove down to 2. The growth came from Epic 3's MSAL/auth tooling and the `@azure/static-web-apps-cli` + `azurite` transitive trees drifting, exactly as the BACKLOG "override maintenance cost" entry predicted. Triage confirmed **0 of 91 execute in the deployed, internet-facing app** — 80 are `scope=development`, and even the 11 `scope=runtime` are frontend **build** tools (`vite`/`browserslist`/`@babel/core`) that never ship to the browser (the deployed API is an isolated `--ignore-workspace` build; the frontend ships static built assets, no `node_modules`). So this is hygiene + public-repo honesty, not a deployed-app vulnerability.*
+
+- As a repo maintainer, I want the open Dependabot alerts driven back down and the stale `SECURITY.md` claim ("only `uuid` remains") corrected, so a casual public-repo browser sees a true, triaged posture rather than 91 unexplained alerts.
+
+Acceptance:
+- All 91 open alerts categorized (severity × scope × manifest); the categorization confirms none are in a deployed runtime dependency (recorded in the triage note).
+- The fixable families are cleared by a within-range `pnpm update -r` refresh (pulls the fixed transitives the ranges already permit — the bulk of the drop; bumps `@azure/static-web-apps-cli` 2.1.0, `azurite` 3.38.0, `azure-functions-core-tools` 4.17.0, `vite` 6.4.6, `vitest` 4.1.12, and carries **within-major** bumps of the frontend runtime deps — react/react-dom 19.0→19.3, msal-browser 5.27→5.30, msal-react 5.7→5.8) plus the `happy-dom` `^20`→`^21` bump and refreshed exact-pin `overrides` in `pnpm-workspace.yaml` for the residual transitive advisories (deterministic exact pins per the 3.1.5 methodology, now including a range-window selector for multi-major deps). **No breaking major bump of any shipped dependency; no new source files.**
+- The genuinely-unpatched + dev-only + unreachable advisories (`extract-zip`, `node-forge`, `adm-zip` instances with no upstream fix) are **dismissed in GitHub with a reason** (mirroring the `uuid` precedent) — not left silently open.
+- Dev stack re-verified against the bumped tree: clean `pnpm -r build`, full test suite green, and azurite blob/queue/table round-trip (azurite is the fragile dependent — the whole reason overrides are exact-pinned).
+- `SECURITY.md` rewritten to the true current numbers + reasoning; `docs/BACKLOG.md` override-maintenance entry updated; `docs/VERSIONS.md` milestone recorded. Post-merge, the live Dependabot count is the confirmation (like Sprint 6.0's post-merge live check — Dependabot only re-scans the default branch after merge).
+- Depends on: nothing new (dev-tooling only). Does NOT touch deployed infra, the D22 gate, or any runtime code path.
+
+---
+
 ## Sprint 6.1 — Transcode logic  **[Agent]**
 - As a developer, I want the worker to read a raw file, transcode to the chosen format, write to `finished`, fill format/size/duration, and flip the record to `ready` — or `failed` on error.
 

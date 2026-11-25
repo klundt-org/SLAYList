@@ -16,6 +16,7 @@ allowBuilds:
   azure-functions-core-tools: true
   esbuild: true
   keytar: true
+  protobufjs: false
 
 # `overrides` force patched versions of vulnerable transitive deps (Sprint 3.1.5 security triage).
 # Every one is scope=development, pulled ONLY by dev tooling (azurite, @azure/static-web-apps-cli);
@@ -31,17 +32,32 @@ allowBuilds:
 #   * `@<target>` SELECTOR: only the vulnerable (below-target) instances are overridden. A future
 #     runtime package that legitimately depends on a >= target version is left untouched -- so these
 #     dev-tree pins can never accidentally DOWNGRADE healthy runtime code.
+#   * RANGE-WINDOW selector (`pkg@>=A <B`) -- added Sprint 6.0.1 for deps that live on MULTIPLE major
+#     lines in the tree at once (e.g. the frontend's healthy `vite@6.4.6` vs. `vitest`'s bundled
+#     `vite@7.x`). A blanket `vite@<7.3.7` would force the healthy 6.x line up to a 7.x MAJOR; the
+#     window `vite@>=7.0.0 <7.3.7` patches ONLY the vulnerable 7.x instances and leaves 6.4.6 alone.
 #
 # MAINTENANCE -- exact pins mean a NEW CVE in a pinned version won't auto-resolve. That's by design:
 # Dependabot re-alerts on the pinned version (it's the regression detector); when it does, bump that
 # target DELIBERATELY and RE-VERIFY the azurite blob/queue/table round-trip (azurite is the fragile
 # dependent). Same drill when bumping azurite / @azure/static-web-apps-cli themselves.
 overrides:
-  'axios@<1.17.0': 1.17.0
+  'axios@<1.20.0': 1.20.0
   'tmp@<0.2.7': 0.2.7
   '@azure/identity@<4.13.1': 4.13.1
   'tough-cookie@<6.0.1': 6.0.1
   'xml2js@<0.6.2': 0.6.2
+  # --- Sprint 6.0.1 additions (all dev-only; see SECURITY.md for the per-family triage) ---
+  'adm-zip@<0.6.1': 0.6.1                        # @azure/static-web-apps-cli transitive
+  # extract-zip: NO fix published (latest is 2.0.1; the advisory's ">=2.0.2" doesn't exist yet) ->
+  #   dev-only (azure-functions-core-tools unzips the MS-hosted func binary at install) + unreachable.
+  #   Dismissed in GitHub, not overridden. See SECURITY.md.
+  'vite@>=7.0.0 <7.3.7': 7.3.7                   # vitest's BUNDLED vite 7.x only (frontend stays 6.4.6)
+  'esbuild@>=0.27.3 <0.28.1': 0.28.1             # via vitest > vite 7.x
+  'glob@>=9.0.0 <14.0.2': 14.0.2                 # @azure/static-web-apps-cli transitive (9-14 window)
+  'minimatch@>=7.0.0 <11.0.1': 11.0.1            # @azure/static-web-apps-cli transitive (7-11 window)
+  '@azure/msal-node@<7.1.0': 7.1.0               # @azure/static-web-apps-cli (used only by `swa login`, never run here)
+  '@opentelemetry/instrumentation-http@>=0.204.0 <0.222.0': 0.222.0  # azurite's own App Insights telemetry (runs --silent)
   # uuid is DELIBERATELY NOT overridden: the only patched line (>=11.1.1) dropped the `uuid/v4`
   # subpath export that azurite's legacy @azure/ms-rest-js@1.11.2 does `require('uuid/v4')` against,
   # so forcing it crashes azurite at load (ERR_PACKAGE_PATH_NOT_EXPORTED). The uuid advisory
