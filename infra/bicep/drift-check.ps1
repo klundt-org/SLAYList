@@ -117,7 +117,7 @@ $NoiseLeaves = @(
 
 # Leaves that what-if reports OPAQUELY (it can't actually diff them), where a real change COULD
 # hide: the Container App template array (image, cpu/mem, env vars) and diagnostic-setting log/
-# metric category arrays. These are NOT silently ignored like $NoiseLeaves — they're surfaced
+# metric category arrays. These are NOT silently ignored like $NoiseLeaves - they're surfaced
 # as an always-shown REVIEW note so the check never silently misses a container-image or
 # diag-category change. They do NOT count as drift (they'd appear on every run), but they tell
 # you "this tool can't see these; confirm them yourself or via the same-sprint Bicep discipline."
@@ -191,7 +191,7 @@ if ($review.Count -gt 0) {
   Write-Host "  the Container App image/resources/env and diagnostic-setting categories. Confirm those" -ForegroundColor Magenta
   Write-Host "  manually if you changed them (the same-sprint Bicep discipline is the real guard)." -ForegroundColor Magenta
   Write-Host "  NOTE (Sprint 6.0+, D39 impl.): the live Container App image is EXPECTED to differ from the" -ForegroundColor Magenta
-  Write-Host "  Bicep ':dev' tag — the running DIGEST is CD-managed (deploy-transcoder-dev.yml pins it)," -ForegroundColor Magenta
+  Write-Host "  Bicep ':dev' tag - the running DIGEST is CD-managed (deploy-transcoder-dev.yml pins it)," -ForegroundColor Magenta
   Write-Host "  not Bicep-tracked. A digest mismatch here is by design, NOT drift to 'fix' in the template." -ForegroundColor Magenta
   if ($ShowNoise) { $review | ForEach-Object { Write-Host "  $_" -ForegroundColor Magenta } }
 }
