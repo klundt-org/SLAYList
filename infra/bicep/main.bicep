@@ -143,6 +143,7 @@ module containerApp 'containerapp.bicep' = {
     caeName: names.outputs.caeName
     caName: names.outputs.caName
     lawName: observability.outputs.lawName
+    appInsightsName: observability.outputs.appInsightsName
     containerAppImage: containerAppImage
     containerCpu: containerCpu
     maxReplicas: maxReplicas

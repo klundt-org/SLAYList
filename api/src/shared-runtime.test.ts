@@ -2,8 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_LIBRARY_ID as SHARED_LIBRARY_ID, SONG_STATES as SHARED_STATES } from '@slaylist/shared';
-import { DEFAULT_LIBRARY_ID, SONG_STATES, isSongState } from './shared-runtime.js';
+import {
+  AUDIO_FORMATS as SHARED_FORMATS,
+  DEFAULT_LIBRARY_ID as SHARED_LIBRARY_ID,
+  SONG_STATES as SHARED_STATES,
+} from '@slaylist/shared';
+import { AUDIO_FORMATS, DEFAULT_LIBRARY_ID, SONG_STATES, isAudioFormat, isSongState } from './shared-runtime.js';
 
 /**
  * Drift guard for the runtime mirror (D46). The API can't import @slaylist/shared's runtime values
@@ -24,5 +28,15 @@ describe('shared-runtime mirror stays identical to @slaylist/shared (D46)', () =
     expect(isSongState('bogus')).toBe(false);
     expect(isSongState(undefined)).toBe(false);
     expect(isSongState(42)).toBe(false);
+  });
+
+  it('AUDIO_FORMATS matches shared exactly, in order', () => {
+    expect(AUDIO_FORMATS).toEqual([...SHARED_FORMATS]);
+  });
+
+  it('isAudioFormat accepts every shared format and rejects others', () => {
+    for (const f of SHARED_FORMATS) expect(isAudioFormat(f)).toBe(true);
+    expect(isAudioFormat('mp3')).toBe(false);
+    expect(isAudioFormat(undefined)).toBe(false);
   });
 });

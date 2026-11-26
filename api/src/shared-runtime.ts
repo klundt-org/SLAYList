@@ -19,7 +19,7 @@
  * this mirror collapses back into a direct `import { ... } from '@slaylist/shared'`.
  */
 
-import type { SongState } from '@slaylist/shared';
+import type { AudioFormat, SongState } from '@slaylist/shared';
 
 /** Mirror of `DEFAULT_LIBRARY_ID` (D19). The single library today. */
 export const DEFAULT_LIBRARY_ID = 'slaylist-home';
@@ -30,4 +30,12 @@ export const SONG_STATES: readonly SongState[] = ['processing', 'ready', 'failed
 /** True when `value` is one of the four valid song states. */
 export function isSongState(value: unknown): value is SongState {
   return typeof value === 'string' && (SONG_STATES as readonly string[]).includes(value);
+}
+
+/** Mirror of `AUDIO_FORMATS` (Sprint 6.1) — the finished-audio formats a record may carry. */
+export const AUDIO_FORMATS: readonly AudioFormat[] = ['m4a', 'opus'];
+
+/** True when `value` is one of the valid finished-audio formats. */
+export function isAudioFormat(value: unknown): value is AudioFormat {
+  return typeof value === 'string' && (AUDIO_FORMATS as readonly string[]).includes(value);
 }

@@ -26,7 +26,7 @@ import { callerHasRole, getCaller } from '../auth.js';
 import { callerLibraryId } from '../songs/library.js';
 import { getSongsRepository } from '../songs/repo.js';
 import { newSongId } from '../songs/ids.js';
-import { isSongState } from '../shared-runtime.js';
+import { isAudioFormat, isSongState } from '../shared-runtime.js';
 
 const WRITE_ROLES: readonly Role[] = ['uploader', 'admin'];
 const READ_ROLES: readonly Role[] = ['listener', 'uploader', 'admin'];
@@ -140,7 +140,7 @@ function buildUpdatePatch(body: Record<string, unknown>): { patch: SongUpdateInp
     patch.blobPath = body.blobPath;
   }
   if (body.format !== undefined) {
-    if (typeof body.format !== 'string') return { error: 'format must be a string' };
+    if (!isAudioFormat(body.format)) return { error: 'format must be one of m4a|opus' };
     patch.format = body.format;
   }
   if (body.sizeBytes !== undefined) {

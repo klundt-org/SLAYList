@@ -3,7 +3,12 @@
 #
 # Sprint 6.0 — builds the transcoder container image, pushes it to GHCR, and updates the dev
 # Container App revision. The image-side counterpart to deploy-dev.yml (which ships frontend+API).
+# Sprint 6.1 — tests + esbuild-bundles the real transcoder first; the Dockerfile adds ffmpeg and
+# fails the build on a D27 codec violation (aac/libopus missing, or libfdk_aac present).
 #
+#   - Runs on push to develop, or workflow_dispatch from ANY branch — a sprint branch is deployed to
+#     dev this way so live verification happens BEFORE /wrap-sprint (CLAUDE.md "Branch pushed !=
+#     sprint done").
 #   - Registry: PUBLIC GHCR (ghcr.io/klundt-org/slaylist-transcoder) — D49. The image holds only
 #     public (AGPL) code + public tooling, no secrets or family data, so a public image leaks
 #     nothing AND needs no pull credential on the Container App.
@@ -21,6 +26,9 @@ on:
     branches: [develop]
     paths:
       - 'transcoder/**'
+      - 'shared/**'               # bundled INTO the image (Sprint 6.1) — a shared change must rebuild it
+      - 'pnpm-lock.yaml'          # dependency changes alter the bundle
+      - 'pnpm-workspace.yaml'
       - '.github/workflows/deploy-transcoder-dev.yml'
   workflow_dispatch:
 
@@ -41,6 +49,20 @@ jobs:
     environment: dev    # OIDC subject -> environment:dev; exposes dev env-scoped secrets only
     steps:
       - uses: actions/checkout@v4
+
+      # Sprint 6.1: the image ships an esbuild BUNDLE (shared + Azure SDKs inlined) built here, because
+      # the Docker context (./transcoder) can't see ../shared. Same pnpm setup as deploy-dev.yml.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@v4
+        with:
+          standalone: true   # pnpm 11.3.0 needs Node >= 22.13; the JS action itself runs on Node 20
+      - run: pnpm install --frozen-lockfile
+      - name: Test the transcoder (+ shared) before building the image
+        run: pnpm --filter "@slaylist/transcoder..." run test
+      - name: Bundle the transcoder (dist/index.mjs)
+        run: pnpm --filter @slaylist/transcoder run build
 
       - uses: docker/setup-buildx-action@v3
 

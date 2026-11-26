@@ -104,6 +104,7 @@ describe('POST /api/upload (Sprint 5.2)', () => {
     expect(mockPutRaw).toHaveBeenCalledTimes(1);
     const putArg = mockPutRaw.mock.calls[0]![0];
     expect(putArg.songId).toBe(song.id);
+    expect(putArg.libraryId).toBe(song.libraryId); // stamped so the transcoder never assumes one library
     expect(putArg.blobName).toMatch(/^my-song_\d{8}-\d{6}_.+\.mp3$/);
 
     expect(createMock).toHaveBeenCalledTimes(1);

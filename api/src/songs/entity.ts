@@ -16,6 +16,7 @@
 
 import type { Song, SongState } from '@slaylist/shared';
 import type { TableEntity } from '@azure/data-tables';
+import { isAudioFormat } from '../shared-runtime.js';
 
 /** The Table Storage shape of a song: the non-key `Song` fields plus the partition/row keys. */
 export type SongEntity = TableEntity<{
@@ -69,7 +70,9 @@ export function entityToSong(e: SongEntity): Song {
   if (e.genre !== undefined) song.genre = e.genre;
   if (e.deactivatedAt !== undefined) song.deactivatedAt = e.deactivatedAt;
   if (e.blobPath !== undefined) song.blobPath = e.blobPath;
-  if (e.format !== undefined) song.format = e.format;
+  // Stored as a plain string; only a known format is surfaced (upgrade-on-read, D45) — an
+  // unrecognized value reads as absent rather than leaking an invalid union member.
+  if (e.format !== undefined && isAudioFormat(e.format)) song.format = e.format;
   if (e.sizeBytes !== undefined) song.sizeBytes = e.sizeBytes;
   if (e.durationSec !== undefined) song.durationSec = e.durationSec;
   return song;

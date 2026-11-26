@@ -5,8 +5,9 @@
  * Writes uploaded originals to the `raw-uploads` blob container (Sprint 5.2).
  *
  * `raw-uploads` is the canonical archive of the kids' creations (D28) — this module only ever
- * WRITES; nothing here (or anywhere) deletes from it. The blob is tagged with `songid` metadata so
- * the Epic 6/7 transcoder can map the raw file back to its Song record. Connection-string auth
+ * WRITES; nothing here (or anywhere) deletes from it. The blob is tagged with `songid` + `libraryid`
+ * metadata so the Epic 6/7 transcoder can map the raw file back to its Song record (PartitionKey =
+ * libraryId, RowKey = songId — D45) without assuming a single library (D19). Connection-string auth
  * (D25, via the shared resolver). The container is provisioned by Bicep (Sprint 1.3).
  */
 
@@ -39,11 +40,12 @@ export async function putRawUpload(args: {
   data: Buffer;
   contentType: string;
   songId: string;
+  libraryId: string;
 }): Promise<void> {
   const blob = getRawUploadsContainer().getBlockBlobClient(args.blobName);
   await blob.uploadData(args.data, {
     blobHTTPHeaders: { blobContentType: args.contentType },
-    metadata: { songid: args.songId },
+    metadata: { songid: args.songId, libraryid: args.libraryId },
     conditions: { ifNoneMatch: '*' }, // never overwrite an existing original (D28 safety)
   });
 }

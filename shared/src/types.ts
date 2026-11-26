@@ -42,6 +42,20 @@ export type Role = (typeof ROLES)[number];
 export const DEFAULT_LIBRARY_ID = 'slaylist-home';
 
 /**
+ * The finished-audio formats a song record may carry (D9 / D27). The union keeps both documented
+ * formats so a future format switch is an additive change, not a breaking one (D45 additive-only).
+ */
+export const AUDIO_FORMATS = ['m4a', 'opus'] as const;
+export type AudioFormat = (typeof AUDIO_FORMATS)[number];
+
+/**
+ * The single output format the transcoder produces today — AAC in an MP4 (.m4a) container, via
+ * ffmpeg's built-in `aac` encoder (D27; libfdk_aac forbidden). Decided in Sprint 6.1 (D9): AAC
+ * plays natively on every target device incl. iOS Safari; Opus was the rejected alternative.
+ */
+export const OUTPUT_FORMAT: AudioFormat = 'm4a';
+
+/**
  * The canonical song record. Lives in Table Storage (D3); never in a JSON file.
  *
  * Field discipline:
@@ -78,10 +92,8 @@ export interface Song {
   deactivatedAt?: string;
   /** Pointer to the finished file in the `finished` blob container. */
   blobPath?: string;
-  // TODO(Epic 6): narrow to a union (e.g., 'opus' | 'm4a') once the single
-  // output format is decided in Sprint 6.1 per D9.
-  /** Output format (e.g., 'opus', 'm4a'). String for now; narrowed in Epic 6. */
-  format?: string;
+  /** Finished-audio format (one of `AUDIO_FORMATS`; the transcoder writes `OUTPUT_FORMAT`). */
+  format?: AudioFormat;
   /** Size of the finished blob in bytes. Filled by transcoder. */
   sizeBytes?: number;
   /** Duration of the finished audio in seconds. Filled by transcoder. */

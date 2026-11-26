@@ -82,7 +82,7 @@ export async function upload(request: HttpRequest, context: InvocationContext): 
 
   // 3) Write the raw original FIRST (D28 archive; orphan-on-failure is harmless), then the record.
   const contentType = file.type && file.type.startsWith('audio/') ? file.type : 'application/octet-stream';
-  await putRawUpload({ blobName, data, contentType, songId });
+  await putRawUpload({ blobName, data, contentType, songId, libraryId });
 
   const song: Song = {
     id: songId,

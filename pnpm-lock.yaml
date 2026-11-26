@@ -104,9 +104,22 @@ importers:
 
   transcoder:
     dependencies:
+      '@azure/data-tables':
+        specifier: 13.3.2
+        version: 13.3.2
+      '@azure/identity':
+        specifier: 4.14.1
+        version: 4.14.1
+      '@azure/storage-blob':
+        specifier: 12.34.0
+        version: 12.34.0
+    devDependencies:
       '@slaylist/shared':
         specifier: workspace:*
         version: link:../shared
+      esbuild:
+        specifier: 0.28.1
+        version: 0.28.1
 
 packages:
 

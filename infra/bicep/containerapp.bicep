@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 // Container App module — Container App Environment (LAW-linked per D24) + Container App
-// running the transcoder placeholder, with a system-assigned managed identity and two
+// running the transcoder, with a system-assigned managed identity and two
 // RBAC role assignments scoped to the storage account (D25 runtime auth), matching the
 // live dev MI as provisioned in Sprint 1.4:
 //   - Storage Blob Data Contributor  (read raw, write finished)
 //   - Storage Table Data Contributor (flip the Songs record to `ready` on completion)
 //
-// Sprint 6.1 replaces the placeholder image with the real transcoder; Epic 7 adds the
+// Sprint 6.1 replaced the placeholder image with the real transcoder; Epic 7 adds the
 // Event Grid → queue subscription AND the queue-data-plane RBAC the consumer needs
 // (Storage Queue Data Message Processor) — deliberately not captured here because the live
 // dev MI does not carry it yet. RBAC is captured so the MI is ready for blob/table work.
@@ -33,6 +33,9 @@ param storageName string
 
 @description('Log Analytics workspace name — for CAE log-ingestion key lookup (same RG).')
 param lawName string
+
+@description('Application Insights name (same RG) — its connection string is wired into the transcoder as a Container App SECRET (D24 sink), resolved in-template and never emitted as an output.')
+param appInsightsName string
 
 // --- Sizing (parameterized so prod can run a tier or two above dev without forking the
 //     template — D39 "same templates, parameter substitution"). Defaults are the live dev
@@ -79,6 +82,10 @@ resource storageRef 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
   name: storageName
 }
 
+resource appInsightsRef 'Microsoft.Insights/components@2020-02-02' existing = {
+  name: appInsightsName
+}
+
 // --- Container App Environment ---
 resource cae 'Microsoft.App/managedEnvironments@2024-03-01' = {
   name: caeName
@@ -102,7 +109,7 @@ resource cae 'Microsoft.App/managedEnvironments@2024-03-01' = {
   }
 }
 
-// --- Container App (transcoder placeholder until Sprint 6.1) ---
+// --- Container App (the transcoder; real image since Sprint 6.1) ---
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: caName
   location: location
@@ -116,6 +123,15 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
     configuration: {
       activeRevisionsMode: 'Single'
       ingress: null // no inbound HTTP; queue-driven only
+      // Sprint 6.1: the App Insights connection string (D24 telemetry sink) as a Container App
+      // secret, read from the App Insights resource at deploy time — never in the repo, the image,
+      // or a Bicep output. NOT a storage credential: storage stays MI + RBAC only (D25).
+      secrets: [
+        {
+          name: 'appinsights-connection-string'
+          value: appInsightsRef.properties.ConnectionString
+        }
+      ]
     }
     template: {
       containers: [
@@ -128,10 +144,21 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             cpu: json(containerCpu)
             memory: containerMemory
           }
-          // No env vars on the placeholder — matches the live dev Container App (Sprint 1.4).
-          // Runtime auth is MI + RBAC per D25 (no storage connection string here). Sprint 6.1
-          // adds the real transcoder's env wiring (App Insights connection string, queue name,
-          // etc.) when there's an actual workload that needs it.
+          // Sprint 6.1 — the real transcoder's env. Storage auth is MI + RBAC per D25: only the
+          // account NAME is passed (to build the blob/table endpoints); there is NO storage
+          // connection string / key anywhere on this app. The queue name lands with Epic 7.
+          // The manual one-shot trigger (TRANSCODE_ONESHOT_BLOB) is deliberately NOT in Bicep —
+          // it is a transient operator setting applied and removed around a verification run.
+          env: [
+            {
+              name: 'STORAGE_ACCOUNT_NAME'
+              value: storageName
+            }
+            {
+              name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+              secretRef: 'appinsights-connection-string'
+            }
+          ]
         }
       ]
       scale: {
